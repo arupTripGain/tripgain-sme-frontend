@@ -622,12 +622,12 @@ export default function MailboxesPage() {
           {filteredMailboxes.map((mailbox) => {
             const stats = mailbox.stats || {};
             const dailyLimit = Number(mailbox.dailySendLimit) || 50;
-            const sentToday = Number(mailbox.emailsSentToday) || 0;
+            const sentToday = stats.emailsSentToday !== undefined ? stats.emailsSentToday : (Number(mailbox.emailsSentToday) || 0);
             const remainingToday = stats.remainingToday ?? Math.max(0, dailyLimit - sentToday);
             const dailyPercent = Math.min(100, Math.round((sentToday / Math.max(1, dailyLimit)) * 100));
 
             const hourlyLimit = Number(mailbox.hourlySendLimit) || 10;
-            const sentThisHour = Number(mailbox.emailsSentThisHour) || 0;
+            const sentThisHour = stats.emailsSentThisHour !== undefined ? stats.emailsSentThisHour : (Number(mailbox.emailsSentThisHour) || 0);
             const remainingThisHour = stats.remainingThisHour ?? Math.max(0, hourlyLimit - sentThisHour);
             const hourlyPercent = Math.min(100, Math.round((sentThisHour / Math.max(1, hourlyLimit)) * 100));
 
@@ -986,12 +986,12 @@ export default function MailboxesPage() {
                 {filteredMailboxes.map((mailbox) => {
                   const stats = mailbox.stats || {};
                   const dailyLimit = Number(mailbox.dailySendLimit) || 50;
-                  const sentToday = Number(mailbox.emailsSentToday) || 0;
+                  const sentToday = stats.emailsSentToday !== undefined ? stats.emailsSentToday : (Number(mailbox.emailsSentToday) || 0);
                   const remainingToday = stats.remainingToday ?? Math.max(0, dailyLimit - sentToday);
                   const dailyPercent = Math.min(100, Math.round((sentToday / Math.max(1, dailyLimit)) * 100));
 
                   const hourlyLimit = Number(mailbox.hourlySendLimit) || 10;
-                  const sentThisHour = Number(mailbox.emailsSentThisHour) || 0;
+                  const sentThisHour = stats.emailsSentThisHour !== undefined ? stats.emailsSentThisHour : (Number(mailbox.emailsSentThisHour) || 0);
                   const remainingThisHour = stats.remainingThisHour ?? Math.max(0, hourlyLimit - sentThisHour);
 
                   const totalSent = stats.totalSentAllTime ?? sentToday;
@@ -1049,7 +1049,7 @@ export default function MailboxesPage() {
                         <div className="text-secondary font-semibold">
                           {sentThisHour} / {hourlyLimit} <span className="text-muted-foreground text-[10px] font-normal">/ hr</span>
                         </div>
-                        <div className="text-[10px] text-muted-foreground">{remainingThisHour} left this hr</div>
+                        <div className="text-[10px] text-muted-foreground">{remainingThisHour} left this hr • Resets :00</div>
                       </td>
 
                       {/* Sent Till Now */}
