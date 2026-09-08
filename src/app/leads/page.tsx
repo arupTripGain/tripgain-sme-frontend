@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from '@/lib/api';
 import { 
   Search, Plus, Filter, MoreHorizontal, FileDown, Upload, Users, Building2, Trash2,
   Sparkles, CheckCircle2, AlertTriangle, RefreshCw, Eye, X, Clock, AlertCircle, ShieldCheck, ChevronDown
@@ -51,16 +52,16 @@ export default function LeadsPage() {
     try {
       if (activeTab === 'contacts') {
         const url = searchQuery 
-          ? `http://localhost:3001/api/contacts?search=${encodeURIComponent(searchQuery)}` 
-          : 'http://localhost:3001/api/contacts';
-        const res = await fetch(url);
+          ? `/api/contacts?search=${encodeURIComponent(searchQuery)}` 
+          : '/api/contacts';
+        const res = await apiFetch(url);
         const data = await res.json();
         setContacts(Array.isArray(data) ? data : []);
       } else {
         const url = searchQuery 
-          ? `http://localhost:3001/api/lists?search=${encodeURIComponent(searchQuery)}` 
-          : 'http://localhost:3001/api/lists';
-        const res = await fetch(url);
+          ? `/api/lists?search=${encodeURIComponent(searchQuery)}` 
+          : '/api/lists';
+        const res = await apiFetch(url);
         const data = await res.json();
         setLists(Array.isArray(data) ? data : []);
       }
@@ -77,7 +78,7 @@ export default function LeadsPage() {
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`http://localhost:3001/api/contacts/personalization-jobs/${bulkJob.id}`);
+        const res = await apiFetch(`/api/contacts/personalization-jobs/${bulkJob.id}`);
         if (res.ok) {
           const data = await res.json();
           setBulkJob(data);
@@ -103,7 +104,7 @@ export default function LeadsPage() {
       if (bulkScope === 'selected') {
         payload.contactIds = Array.from(selectedContacts);
       }
-      const res = await fetch('http://localhost:3001/api/contacts/bulk-personalize', {
+      const res = await apiFetch('/api/contacts/bulk-personalize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -133,7 +134,7 @@ export default function LeadsPage() {
 
   const handleGenerateForList = async (listId: string) => {
     try {
-      const res = await fetch('http://localhost:3001/api/contacts/bulk-personalize', {
+      const res = await apiFetch('/api/contacts/bulk-personalize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ listId, onlyMissing: true })
@@ -191,7 +192,7 @@ export default function LeadsPage() {
   const handleDeleteContact = async (id: string, name: string) => {
     if (!confirm(`Delete ${name}?\n\nThis will permanently remove the contact and their contact information.`)) return;
     try {
-      const res = await fetch(`http://localhost:3001/api/contacts/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/contacts/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setContacts(contacts.filter(c => c.id !== id));
         const newSet = new Set(selectedContacts);
@@ -208,7 +209,7 @@ export default function LeadsPage() {
     if (!confirm(`Delete ${selectedContacts.size} contacts?\n\nThis will permanently remove them.`)) return;
     try {
       const ids = Array.from(selectedContacts);
-      const res = await fetch(`http://localhost:3001/api/contacts/bulk-delete`, {
+      const res = await apiFetch(`/api/contacts/bulk-delete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids })
@@ -231,7 +232,7 @@ export default function LeadsPage() {
     if (!confirm(`Delete "${name}"?\n\nThis will delete the list and its membership records. Contacts themselves will not be deleted.`)) return;
     
     try {
-      const res = await fetch(`http://localhost:3001/api/lists/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/lists/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setLists(lists.filter(l => l.id !== id));
       }
@@ -254,12 +255,12 @@ export default function LeadsPage() {
   
   // Ensure lists are loaded even if on contacts tab
   useEffect(() => {
-    fetch('http://localhost:3001/api/lists')
+    apiFetch('/api/lists')
       .then(res => res.json())
       .then(data => setLists(Array.isArray(data) ? data : []))
       .catch(console.error);
       
-    fetch('http://localhost:3001/api/campaigns')
+    apiFetch('/api/campaigns')
       .then(res => res.json())
       .then(data => setCampaigns(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -273,7 +274,7 @@ export default function LeadsPage() {
   const handleAddToList = async () => {
     if (!selectedListId) return alert('Please select a list');
     try {
-      const res = await fetch(`http://localhost:3001/api/lists/${selectedListId}/members`, {
+      const res = await apiFetch(`/api/lists/${selectedListId}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contactIds: contactsToAdd })
@@ -300,7 +301,7 @@ export default function LeadsPage() {
   const handleRemoveFromList = async () => {
     if (!selectedListId) return alert('Please select a list');
     try {
-      const res = await fetch(`http://localhost:3001/api/lists/${selectedListId}/members`, {
+      const res = await apiFetch(`/api/lists/${selectedListId}/members`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contactIds: contactsToAdd })
@@ -321,11 +322,11 @@ export default function LeadsPage() {
 
   const handleDuplicateList = async (listId: string) => {
     try {
-      const res = await fetch(`http://localhost:3001/api/lists/${listId}/duplicate`, {
+      const res = await apiFetch(`/api/lists/${listId}/duplicate`, {
         method: 'POST'
       });
       if (res.ok) {
-        fetch('http://localhost:3001/api/lists')
+        apiFetch('/api/lists')
           .then(r => r.json())
           .then(data => setLists(Array.isArray(data) ? data : []));
       } else {
@@ -340,13 +341,13 @@ export default function LeadsPage() {
     const newName = prompt('Enter new list name:', currentName);
     if (!newName || newName === currentName) return;
     try {
-      const res = await fetch(`http://localhost:3001/api/lists/${listId}`, {
+      const res = await apiFetch(`/api/lists/${listId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newName })
       });
       if (res.ok) {
-        fetch('http://localhost:3001/api/lists')
+        apiFetch('/api/lists')
           .then(r => r.json())
           .then(data => setLists(Array.isArray(data) ? data : []));
       }
@@ -363,7 +364,7 @@ export default function LeadsPage() {
   const handleAddToCampaign = async () => {
     if (!selectedCampaignId) return alert('Please select a campaign');
     try {
-      const res = await fetch(`http://localhost:3001/api/campaigns/${selectedCampaignId}/enroll`, {
+      const res = await apiFetch(`/api/campaigns/${selectedCampaignId}/enroll`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contactIds: contactsToAdd })
@@ -388,7 +389,7 @@ export default function LeadsPage() {
 
   const handleMarkDoNotContact = async (contactId: string) => {
     try {
-      const res = await fetch(`http://localhost:3001/api/contacts/${contactId}`, {
+      const res = await apiFetch(`/api/contacts/${contactId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ leadStatus: 'Do Not Contact' })
@@ -401,7 +402,7 @@ export default function LeadsPage() {
 
   const handleAddToSuppression = async (contactId: string) => {
     try {
-      const res = await fetch(`http://localhost:3001/api/lists/suppression-1/members`, {
+      const res = await apiFetch(`/api/lists/suppression-1/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contactIds: [contactId] })
@@ -415,7 +416,7 @@ export default function LeadsPage() {
   const handleExport = async (contactIds: string[]) => {
     if (!contactIds.length) return alert('No contacts selected for export');
     try {
-      const res = await fetch('http://localhost:3001/api/contacts/export', {
+      const res = await apiFetch('/api/contacts/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contactIds })

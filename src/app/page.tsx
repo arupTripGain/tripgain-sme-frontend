@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/api';
 
 import { Users, Send, Reply, CheckCircle, UserPlus, UserMinus } from 'lucide-react';
 
@@ -9,7 +10,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/dashboard')
+    apiFetch('/api/dashboard')
       .then(res => res.json())
       .then(d => {
         setData(d);

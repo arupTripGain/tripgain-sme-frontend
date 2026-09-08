@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { apiFetch } from '@/lib/api';
 import Papa from 'papaparse';
 import { ArrowLeft, UploadCloud, CheckCircle2, AlertCircle, Play, FileSpreadsheet, List as ListIcon, Database } from 'lucide-react';
 
@@ -48,7 +49,7 @@ export default function ImportCSVPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/lists')
+    apiFetch('/api/lists')
       .then(res => res.json())
       .then(data => setLists(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -100,7 +101,7 @@ export default function ImportCSVPage() {
     });
 
     try {
-      const res = await fetch('http://localhost:3001/api/contacts/bulk-import', {
+      const res = await apiFetch('/api/contacts/bulk-import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

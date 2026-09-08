@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import { apiFetch } from '@/lib/api';
 import { ArrowLeft, Save, Building2, User } from 'lucide-react';
 
 export default function EditLeadPage() {
@@ -31,7 +32,7 @@ export default function EditLeadPage() {
     if (!id) return;
     const fetchLead = async () => {
       try {
-        const res = await fetch(`http://localhost:3001/api/contacts/${id}`);
+        const res = await apiFetch(`/api/contacts/${id}`);
         if (res.ok) {
           const data = await res.json();
           setFormData({
@@ -64,7 +65,7 @@ export default function EditLeadPage() {
     setLoading(true);
     
     try {
-      const res = await fetch(`http://localhost:3001/api/contacts/${id}`, {
+      const res = await apiFetch(`/api/contacts/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from '@/lib/api';
 
 export interface User {
   id: string;
@@ -50,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      const res = await fetch('http://localhost:3001/api/auth/login', {
+      const res = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -90,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUser = async () => {
     if (!token) return;
     try {
-      const res = await fetch('http://localhost:3001/api/auth/me', {
+      const res = await apiFetch('/api/auth/me', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {

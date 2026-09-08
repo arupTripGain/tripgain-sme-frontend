@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { apiFetch } from '@/lib/api';
 import { 
   ArrowLeft, Building2, User, Mail, Phone, MapPin, 
   Globe, Calendar, CheckCircle2, Play, 
@@ -25,7 +26,7 @@ export default function LeadProfilePage() {
   useEffect(() => {
     const fetchContact = async () => {
       try {
-        const res = await fetch(`http://localhost:3001/api/contacts/${id}`);
+        const res = await apiFetch(`/api/contacts/${id}`);
         if (!res.ok) throw new Error('Contact not found');
         const data = await res.json();
         setContact(data);
@@ -43,7 +44,7 @@ export default function LeadProfilePage() {
   const handleDelete = async () => {
     if (!confirm(`Delete ${contact.fullName || 'this contact'}?\n\nThis will permanently remove the contact.`)) return;
     try {
-      const res = await fetch(`http://localhost:3001/api/contacts/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/contacts/${id}`, { method: 'DELETE' });
       if (res.ok) {
         router.push('/leads');
       } else {
@@ -57,7 +58,7 @@ export default function LeadProfilePage() {
 
   const handleStatusChange = async (newStatus: string) => {
     try {
-      const res = await fetch(`http://localhost:3001/api/contacts/${id}`, {
+      const res = await apiFetch(`/api/contacts/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ leadStatus: newStatus })
@@ -78,7 +79,7 @@ export default function LeadProfilePage() {
     setPersonalizing(true);
     setPersonalizationError(null);
     try {
-      const res = await fetch(`http://localhost:3001/api/contacts/${contact.id}/personalize`, {
+      const res = await apiFetch(`/api/contacts/${contact.id}/personalize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ force })
@@ -110,7 +111,7 @@ export default function LeadProfilePage() {
   const handleSaveManualPersonalization = async () => {
     if (!contact) return;
     try {
-      const res = await fetch(`http://localhost:3001/api/contacts/${contact.id}/personalize`, {
+      const res = await apiFetch(`/api/contacts/${contact.id}/personalize`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ personalization: editedText })

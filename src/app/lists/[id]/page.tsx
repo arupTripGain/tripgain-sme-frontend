@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { apiFetch } from '@/lib/api';
 import { 
   ArrowLeft, Search, Filter, FileDown, MoreHorizontal, Building2, UploadCloud, UserPlus, Megaphone,
   Sparkles, CheckCircle2, AlertTriangle, RefreshCw, Eye, X, Clock, AlertCircle, ShieldCheck
@@ -23,7 +24,7 @@ export default function ListDashboardPage() {
   const [isStartingBulk, setIsStartingBulk] = useState(false);
 
   const fetchListData = () => {
-    fetch(`http://localhost:3001/api/lists/${id}`)
+    apiFetch(`/api/lists/${id}`)
       .then(res => res.json())
       .then(data => {
         setList(data);
@@ -31,7 +32,7 @@ export default function ListDashboardPage() {
       })
       .catch(console.error);
 
-    fetch(`http://localhost:3001/api/lists/${id}/personalization-stats`)
+    apiFetch(`/api/lists/${id}/personalization-stats`)
       .then(res => res.json())
       .then(data => {
         if (!data.error) setPersonalizationStats(data);
@@ -49,7 +50,7 @@ export default function ListDashboardPage() {
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`http://localhost:3001/api/contacts/personalization-jobs/${bulkJob.id}`);
+        const res = await apiFetch(`/api/contacts/personalization-jobs/${bulkJob.id}`);
         if (res.ok) {
           const data = await res.json();
           setBulkJob(data);
@@ -68,7 +69,7 @@ export default function ListDashboardPage() {
   const handleGenerateMissing = async () => {
     setIsStartingBulk(true);
     try {
-      const res = await fetch('http://localhost:3001/api/contacts/bulk-personalize', {
+      const res = await apiFetch('/api/contacts/bulk-personalize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ listId: id, onlyMissing: true })
@@ -98,7 +99,7 @@ export default function ListDashboardPage() {
   const handleSingleGenerate = async (contactId: string, force = true) => {
     setGeneratingContactId(contactId);
     try {
-      const res = await fetch(`http://localhost:3001/api/contacts/${contactId}/personalize`, {
+      const res = await apiFetch(`/api/contacts/${contactId}/personalize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ force })

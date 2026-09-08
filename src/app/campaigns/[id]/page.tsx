@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { apiFetch } from '@/lib/api';
 import { 
   ArrowLeft, Play, Pause, Square, Trash2, Clock, Mail, Users, 
   CheckCircle2, PlayCircle, StopCircle, RefreshCw, AlertCircle, 
@@ -47,10 +48,9 @@ export default function CampaignDashboardPage() {
   const handleDuplicateCampaign = async () => {
     setDuplicating(true);
     try {
-      const res = await fetch(`http://localhost:3001/api/campaigns/${id}/duplicate`, {
+      const res = await apiFetch(`/api/campaigns/${id}/duplicate`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
           'Content-Type': 'application/json'
         }
       });
@@ -77,28 +77,28 @@ export default function CampaignDashboardPage() {
     setLoading(true);
     try {
       // 1. Fetch Campaign Details
-      const campRes = await fetch(`http://localhost:3001/api/campaigns/${id}`);
+      const campRes = await apiFetch(`/api/campaigns/${id}`);
       const campData = await campRes.json();
       setCampaign(campData);
       
       // 2. Fetch Enrollments
-      const leadRes = await fetch(`http://localhost:3001/api/campaigns/${id}/leads`);
+      const leadRes = await apiFetch(`/api/campaigns/${id}/leads`);
       const leadData = await leadRes.json();
       const loadedEnrollments = Array.isArray(leadData) ? leadData : [];
       setEnrollments(loadedEnrollments);
       
       // 3. Fetch Analytics
-      const analyticsRes = await fetch(`http://localhost:3001/api/campaigns/${id}/analytics`);
+      const analyticsRes = await apiFetch(`/api/campaigns/${id}/analytics`);
       const analyticsData = await analyticsRes.json();
       setAnalytics(analyticsData);
       
       // 4. Fetch Audit Logs
-      const auditRes = await fetch(`http://localhost:3001/api/campaigns/${id}/audit-logs`);
+      const auditRes = await apiFetch(`/api/campaigns/${id}/audit-logs`);
       const auditData = await auditRes.json();
       setAuditLogs(Array.isArray(auditData) ? auditData : []);
 
       // 5. Fetch Contacts for variable preview testing
-      const contactsRes = await fetch(`http://localhost:3001/api/contacts`);
+      const contactsRes = await apiFetch(`/api/contacts`);
       if (contactsRes.ok) {
         const cData = await contactsRes.json();
         const contactList = Array.isArray(cData) ? cData : (cData.contacts || []);
@@ -171,7 +171,7 @@ export default function CampaignDashboardPage() {
   const handleLaunchCampaign = async () => {
     setLaunching(true);
     try {
-      const res = await fetch(`http://localhost:3001/api/campaigns/${id}/activate`, {
+      const res = await apiFetch(`/api/campaigns/${id}/activate`, {
         method: 'POST'
       });
       const data = await res.json();
@@ -192,7 +192,7 @@ export default function CampaignDashboardPage() {
   const handlePauseCampaign = async () => {
     setPausing(true);
     try {
-      const res = await fetch(`http://localhost:3001/api/campaigns/${id}/pause`, {
+      const res = await apiFetch(`/api/campaigns/${id}/pause`, {
         method: 'POST'
       });
       const data = await res.json();
@@ -212,7 +212,7 @@ export default function CampaignDashboardPage() {
   const runSchedulerTick = async () => {
     setTicking(true);
     try {
-      const res = await fetch(`http://localhost:3001/api/scheduler/tick`, { 
+      const res = await apiFetch(`/api/scheduler/tick`, { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -235,7 +235,7 @@ export default function CampaignDashboardPage() {
   const simulateWebhook = async (enrollmentId: string, eventType: string) => {
     setSimulatingEvent(true);
     try {
-      const res = await fetch(`http://localhost:3001/api/webhooks/simulate-event`, {
+      const res = await apiFetch(`/api/webhooks/simulate-event`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enrollmentId, eventType })
@@ -255,7 +255,7 @@ export default function CampaignDashboardPage() {
   const handleDeleteCampaign = async () => {
     setDeleting(true);
     try {
-      const res = await fetch(`http://localhost:3001/api/campaigns/${id}`, {
+      const res = await apiFetch(`/api/campaigns/${id}`, {
         method: 'DELETE'
       });
       if (res.ok) {
@@ -274,7 +274,7 @@ export default function CampaignDashboardPage() {
 
   const changeEnrollmentStatus = async (enrollmentId: string, action: 'pause' | 'resume' | 'stop') => {
     try {
-      const res = await fetch(`http://localhost:3001/api/campaigns/${id}/enrollments/${enrollmentId}/status`, {
+      const res = await apiFetch(`/api/campaigns/${id}/enrollments/${enrollmentId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action })

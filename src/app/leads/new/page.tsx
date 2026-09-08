@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { apiFetch } from '@/lib/api';
 import { ArrowLeft, Save, Building2, User } from 'lucide-react';
 
 export default function AddLeadPage() {
@@ -30,7 +31,7 @@ export default function AddLeadPage() {
     setLoading(true);
     
     try {
-      const res = await fetch('http://localhost:3001/api/contacts', {
+      const res = await apiFetch('/api/contacts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)

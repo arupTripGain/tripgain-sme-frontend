@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
+import { apiFetch } from '@/lib/api';
 import logoImg from '@/app/Tripgain Kinetic.png';
 import { 
   LayoutDashboard, 
@@ -52,7 +53,7 @@ export function AppSidebar() {
   };
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/auth/users')
+    apiFetch('/api/auth/users')
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {

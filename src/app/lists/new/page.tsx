@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { apiFetch } from '@/lib/api';
 import { ArrowLeft, Save, Building2, Plus, Trash2 } from 'lucide-react';
 
 export default function CreateListPage() {
@@ -31,7 +32,7 @@ export default function CreateListPage() {
     if (rules.jobTitle) cleanRules.jobTitle = rules.jobTitle;
 
     try {
-      const res = await fetch('http://localhost:3001/api/lists', {
+      const res = await apiFetch('/api/lists', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

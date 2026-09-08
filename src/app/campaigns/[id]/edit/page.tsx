@@ -143,10 +143,10 @@ function CampaignEditWizard() {
     setLoading(true);
 
     Promise.all([
-      fetch(`http://localhost:3001/api/campaigns/${id}`).then(r => r.json()),
-      fetch('http://localhost:3001/api/lists').then(r => r.json()).catch(() => []),
+      apiFetch(`/api/campaigns/${id}`).then(r => r.json()),
+      apiFetch('/api/lists').then(r => r.json()).catch(() => []),
       apiFetch('/api/mailboxes').then(r => r.json()).catch(() => []),
-      fetch('http://localhost:3001/api/contacts').then(r => r.json()).catch(() => ({ contacts: [] }))
+      apiFetch('/api/contacts').then(r => r.json()).catch(() => ({ contacts: [] }))
     ])
       .then(([campData, listsData, mbData, contactsData]) => {
         if (!campData || campData.error) throw new Error(campData?.error || 'Campaign not found');
@@ -265,7 +265,7 @@ function CampaignEditWizard() {
       }
       
       if (params.toString()) {
-        fetch(`http://localhost:3001/api/campaigns/eligibility?${params.toString()}`)
+        apiFetch(`/api/campaigns/eligibility?${params.toString()}`)
           .then(r => r.json())
           .then(data => setEligibility(data))
           .catch(console.error);
@@ -343,7 +343,7 @@ function CampaignEditWizard() {
     if (!aiPrompt.trim()) return;
     setAiLoading(true);
     try {
-      const res = await fetch('http://localhost:3001/api/ai/generate-template', {
+      const res = await apiFetch('/api/ai/generate-template', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

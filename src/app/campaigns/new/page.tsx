@@ -128,7 +128,7 @@ export default function CampaignComposerPage() {
   const [mailboxSearch, setMailboxSearch] = useState('');
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/lists')
+    apiFetch('/api/lists')
       .then(res => res.json())
       .then(data => setLists(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -149,7 +149,7 @@ export default function CampaignComposerPage() {
       })
       .catch(console.error);
 
-    fetch('http://localhost:3001/api/contacts')
+    apiFetch('/api/contacts')
       .then(res => res.json())
       .then(data => {
         const fetchedContacts = data.contacts || (Array.isArray(data) ? data : []);
@@ -197,7 +197,7 @@ export default function CampaignComposerPage() {
       }
       
       if (params.toString()) {
-        fetch(`http://localhost:3001/api/campaigns/eligibility?${params.toString()}`)
+        apiFetch(`/api/campaigns/eligibility?${params.toString()}`)
           .then(r => r.json())
           .then(data => setEligibility(data))
           .catch(console.error);
@@ -234,7 +234,7 @@ export default function CampaignComposerPage() {
     if (!aiPrompt.trim()) return;
     setAiLoading(true);
     try {
-      const res = await fetch('http://localhost:3001/api/ai/generate-template', {
+      const res = await apiFetch('/api/ai/generate-template', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -393,7 +393,7 @@ export default function CampaignComposerPage() {
       if (!composeRes.ok) throw new Error('Failed to compose campaign');
       const campaign = await composeRes.json();
       
-      const activateRes = await fetch(`http://localhost:3001/api/campaigns/${campaign.id}/activate`, {
+      const activateRes = await apiFetch(`/api/campaigns/${campaign.id}/activate`, {
         method: 'POST'
       });
       

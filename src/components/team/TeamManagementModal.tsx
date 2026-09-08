@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, UserPlus, Trash2, Shield, User, Briefcase, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { apiFetch } from '@/lib/api';
 
 interface TeamUser {
   id: string;
@@ -31,7 +32,7 @@ export function TeamManagementModal({ isOpen, onClose }: { isOpen: boolean; onCl
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:3001/api/auth/users');
+      const res = await apiFetch('/api/auth/users');
       if (res.ok) {
         const data = await res.json();
         setUsers(data);
@@ -58,7 +59,7 @@ export function TeamManagementModal({ isOpen, onClose }: { isOpen: boolean; onCl
     setSuccess('');
 
     try {
-      const res = await fetch('http://localhost:3001/api/auth/users', {
+      const res = await apiFetch('/api/auth/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password, role })
@@ -90,7 +91,7 @@ export function TeamManagementModal({ isOpen, onClose }: { isOpen: boolean; onCl
     if (!confirm(`Are you sure you want to remove ${userName} from this workspace?`)) return;
 
     try {
-      const res = await fetch(`http://localhost:3001/api/auth/users/${userId}`, {
+      const res = await apiFetch(`/api/auth/users/${userId}`, {
         method: 'DELETE'
       });
 

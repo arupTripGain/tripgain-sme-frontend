@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { apiFetch } from '@/lib/api';
 import { 
   BarChart, TrendingUp, TrendingDown, Mail, CheckCircle2, 
   CornerUpLeft, Star, Users, Briefcase, Filter, Search, 
@@ -12,7 +13,7 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/analytics')
+    apiFetch('/api/analytics')
       .then(res => res.json())
       .then(d => {
         setData(d);
