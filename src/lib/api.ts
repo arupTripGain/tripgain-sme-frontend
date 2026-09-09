@@ -26,7 +26,7 @@ export function getAuthHeaders(): HeadersInit {
 export async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   const authHeaders = getAuthHeaders();
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/+$/, '');
   const url = input.startsWith('http') ? input : `${baseUrl}${input.startsWith('/') ? '' : '/'}${input}`;
 
   const mergedHeaders = {
