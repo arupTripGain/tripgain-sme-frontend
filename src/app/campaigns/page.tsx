@@ -242,11 +242,21 @@ export default function CampaignsPage() {
                   <div className="grid grid-cols-2 gap-8 text-center border-r border-border pr-8 hidden sm:grid">
                     <div>
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Sent</p>
-                      <p className="text-lg font-bold text-secondary">{campaign.sentCount ?? 0}</p>
+                      <p className="text-lg font-bold text-secondary">{campaign.totalSentMessages ?? campaign.sentCount ?? 0}</p>
+                      {campaign.uniqueSentCount !== undefined && campaign.uniqueSentCount > 0 && (
+                        <span className="text-[10px] text-muted-foreground block -mt-0.5">
+                          {campaign.uniqueSentCount} {campaign.uniqueSentCount === 1 ? 'contact' : 'contacts'}
+                        </span>
+                      )}
                     </div>
                     <div>
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Replies</p>
                       <p className="text-lg font-bold text-green-600">{campaign.replyRate ?? 0}%</p>
+                      {campaign.repliesCount !== undefined && (
+                        <span className="text-[10px] text-muted-foreground block -mt-0.5">
+                          {campaign.repliesCount} {campaign.repliesCount === 1 ? 'reply' : 'replies'}
+                        </span>
+                      )}
                     </div>
                   </div>
                   
