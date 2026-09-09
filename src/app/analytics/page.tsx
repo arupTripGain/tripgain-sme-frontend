@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 import { 
   BarChart, TrendingUp, TrendingDown, Mail, CheckCircle2, 
   CornerUpLeft, Star, Users, Briefcase, Filter, Search, 
@@ -9,17 +10,23 @@ import {
 } from 'lucide-react';
 
 export default function AnalyticsPage() {
+  const { user } = useAuth();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     apiFetch('/api/analytics')
       .then(res => res.json())
       .then(d => {
         setData(d);
         setLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to load analytics:', err);
+        setLoading(false);
       });
-  }, []);
+  }, [user?.id]);
 
   if (loading) return <div className="p-8 text-center text-gray-500">Loading Analytics...</div>;
 

@@ -73,16 +73,17 @@ export function AppSidebar() {
     { label: 'Settings', icon: Settings, href: '/settings' },
   ];
 
-  const displayName = user?.name || 'Arup Nirala';
-  const displayEmail = user?.email || 'admin@tripgain.com';
-  const displayRole = user?.role || 'ADMIN';
+  const displayName = user?.name || user?.email?.split('@')[0] || 'User';
+  const displayEmail = user?.email || '';
+  const displayRole = user?.role || 'MEMBER';
 
   const initials = displayName
     .split(' ')
+    .filter(Boolean)
     .map((n) => n[0])
     .join('')
     .slice(0, 2)
-    .toUpperCase();
+    .toUpperCase() || 'U';
 
   const handleQuickSwitch = async (email: string) => {
     setShowUserMenu(false);

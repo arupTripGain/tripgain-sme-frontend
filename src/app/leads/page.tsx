@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 import { 
   Search, Plus, Filter, MoreHorizontal, FileDown, Upload, Users, Building2, Trash2,
   Sparkles, CheckCircle2, AlertTriangle, RefreshCw, Eye, X, Clock, AlertCircle, ShieldCheck, ChevronDown
@@ -11,6 +12,7 @@ import {
 
 export default function LeadsPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'contacts' | 'lists'>('contacts');
   
   const [contacts, setContacts] = useState<any[]>([]);
@@ -38,7 +40,7 @@ export default function LeadsPage() {
     fetchData();
     setSelectedContacts(new Set());
     setActiveMenuId(null);
-  }, [activeTab]);
+  }, [activeTab, user?.id]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {

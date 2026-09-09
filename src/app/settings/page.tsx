@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
+import { apiFetch } from '@/lib/api';
 import { 
   Settings as SettingsIcon, 
   User, 
@@ -169,13 +171,19 @@ function GeneralSettings() {
 }
 
 function ProfileSettings() {
+  const { user } = useAuth();
+  const nameParts = (user?.name || '').trim().split(' ');
+  const firstName = nameParts[0] || '';
+  const lastName = nameParts.slice(1).join(' ') || '';
+  const avatarInitial = (user?.name?.[0] || user?.email?.[0] || 'U').toUpperCase();
+
   return (
     <div className="space-y-6 animate-in fade-in">
       <h2 className="text-xl font-bold" style={{ color: '#14385F' }}>Profile</h2>
       
       <div className="flex items-center gap-6 mb-8">
         <div className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-inner" style={{ backgroundColor: '#14385F' }}>
-          A
+          {avatarInitial}
         </div>
         <div>
           <button className="text-sm font-medium border px-3 py-1.5 rounded-md hover:bg-gray-50 transition-colors" style={{ borderColor: '#E0C0B2', color: '#14385F' }}>
@@ -187,21 +195,21 @@ function ProfileSettings() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-1.5">
           <label className="text-sm font-semibold text-gray-700">First Name</label>
-          <input type="text" defaultValue="Arup" className="w-full h-10 px-3 rounded-md border border-gray-300 text-sm focus:ring-2 focus:ring-[#F16F21] outline-none" />
+          <input type="text" key={`fn-${user?.id}`} defaultValue={firstName} className="w-full h-10 px-3 rounded-md border border-gray-300 text-sm focus:ring-2 focus:ring-[#F16F21] outline-none" />
         </div>
         <div className="space-y-1.5">
           <label className="text-sm font-semibold text-gray-700">Last Name</label>
-          <input type="text" defaultValue="Nirala" className="w-full h-10 px-3 rounded-md border border-gray-300 text-sm focus:ring-2 focus:ring-[#F16F21] outline-none" />
+          <input type="text" key={`ln-${user?.id}`} defaultValue={lastName} className="w-full h-10 px-3 rounded-md border border-gray-300 text-sm focus:ring-2 focus:ring-[#F16F21] outline-none" />
         </div>
         
         <div className="space-y-1.5">
           <label className="text-sm font-semibold text-gray-700">Email Address</label>
-          <input type="email" defaultValue="arup@tripgain.com" className="w-full h-10 px-3 rounded-md border border-gray-300 text-sm focus:ring-2 focus:ring-[#F16F21] outline-none" />
+          <input type="email" key={`em-${user?.id}`} defaultValue={user?.email || ''} className="w-full h-10 px-3 rounded-md border border-gray-300 text-sm focus:ring-2 focus:ring-[#F16F21] outline-none" />
         </div>
         
         <div className="space-y-1.5">
           <label className="text-sm font-semibold text-gray-700">Role</label>
-          <input type="text" defaultValue="Admin" disabled className="w-full h-10 px-3 rounded-md border border-gray-200 bg-gray-50 text-sm text-gray-500" />
+          <input type="text" value={user?.role || 'MEMBER'} disabled className="w-full h-10 px-3 rounded-md border border-gray-200 bg-gray-50 text-sm text-gray-500" />
         </div>
       </div>
 
@@ -215,35 +223,58 @@ function ProfileSettings() {
 }
 
 function MailboxesSettings() {
+  const { user } = useAuth();
+  const [mailboxes, setMailboxes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiFetch('/api/mailboxes')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setMailboxes(data);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [user?.id]);
+
   return (
     <div className="space-y-6 animate-in fade-in">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold" style={{ color: '#14385F' }}>Mailboxes</h2>
-        <Link href="/settings/mailboxes" className="px-4 py-2 rounded-md font-bold text-white transition-opacity hover:opacity-90 text-sm" style={{ backgroundColor: '#F16F21' }}>
+        <Link href="/mailboxes" className="px-4 py-2 rounded-md font-bold text-white transition-opacity hover:opacity-90 text-sm" style={{ backgroundColor: '#F16F21' }}>
           + Connect Mailbox
         </Link>
       </div>
       
       <p className="text-sm text-gray-600 mb-6">Manage email accounts used for sending campaigns and receiving replies.</p>
 
-      <div className="border rounded-lg p-5 flex flex-col md:flex-row md:items-center justify-between gap-4" style={{ borderColor: '#E0C0B2', backgroundColor: '#FFF8F4' }}>
-        <div>
-          <div className="font-bold text-lg" style={{ color: '#14385F' }}>arup@tripgain.com</div>
-          <div className="text-sm text-gray-600 mb-2">Google Workspace</div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-green-700">
-            <span className="w-2 h-2 rounded-full bg-green-500"></span> Connected
-          </div>
-          <div className="text-xs text-gray-500 mt-1">Last synced: 2 minutes ago</div>
-        </div>
-        <div className="flex gap-2">
-          <Link href="/settings/mailboxes" className="px-3 py-1.5 text-sm font-medium bg-white border rounded hover:bg-gray-50" style={{ borderColor: '#E0C0B2', color: '#14385F' }}>
-            Manage
+      {loading ? (
+        <div className="text-sm text-gray-500 py-4">Loading connected mailboxes...</div>
+      ) : mailboxes.length === 0 ? (
+        <div className="border border-dashed rounded-lg p-8 text-center" style={{ borderColor: '#E0C0B2' }}>
+          <p className="text-sm text-gray-600 mb-4">No mailboxes connected for your account yet.</p>
+          <Link href="/mailboxes" className="px-4 py-2 rounded-md font-medium text-white text-sm" style={{ backgroundColor: '#14385F' }}>
+            Connect Your First Mailbox
           </Link>
-          <button className="px-3 py-1.5 text-sm font-medium bg-white border border-red-200 text-red-600 rounded hover:bg-red-50">
-            Disconnect
-          </button>
         </div>
-      </div>
+      ) : (
+        mailboxes.map(m => (
+          <div key={m.id} className="border rounded-lg p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3" style={{ borderColor: '#E0C0B2', backgroundColor: '#FFF8F4' }}>
+            <div>
+              <div className="font-bold text-lg" style={{ color: '#14385F' }}>{m.email}</div>
+              <div className="text-sm text-gray-600 mb-2">{m.displayName || m.provider}</div>
+              <div className="flex items-center gap-2 text-xs font-semibold text-green-700">
+                <span className="w-2 h-2 rounded-full bg-green-500"></span> {m.status}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Link href="/mailboxes" className="px-3 py-1.5 text-sm font-medium bg-white border rounded hover:bg-gray-50" style={{ borderColor: '#E0C0B2', color: '#14385F' }}>
+                Manage
+              </Link>
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 }
@@ -320,6 +351,10 @@ function SendingSettings() {
 }
 
 function EmailSettings() {
+  const { user } = useAuth();
+  const defaultSenderName = user?.name ? `${user.name} from TripGain` : 'TripGain Outreach';
+  const defaultSignature = `Best,\n${user?.name?.split(' ')[0] || 'Team'}\nTripGain`;
+
   return (
     <div className="space-y-8 animate-in fade-in">
       <h2 className="text-xl font-bold" style={{ color: '#14385F' }}>Email Settings</h2>
@@ -329,7 +364,7 @@ function EmailSettings() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-1.5">
             <label className="text-sm font-semibold text-gray-700">Sender Name</label>
-            <input type="text" defaultValue="Arup from TripGain" className="w-full h-10 px-3 rounded-md border border-gray-300 text-sm focus:ring-2 focus:ring-[#F16F21] outline-none" />
+            <input type="text" key={`sn-${user?.id}`} defaultValue={defaultSenderName} className="w-full h-10 px-3 rounded-md border border-gray-300 text-sm focus:ring-2 focus:ring-[#F16F21] outline-none" />
           </div>
           <div className="space-y-1.5">
             <label className="text-sm font-semibold text-gray-700">Company Name</label>
@@ -341,8 +376,9 @@ function EmailSettings() {
       <div className="pt-6 border-t" style={{ borderColor: '#E0C0B2' }}>
         <h3 className="text-sm font-bold mb-4" style={{ color: '#14385F' }}>Default Signature</h3>
         <textarea 
+          key={`sig-${user?.id}`}
           rows={4} 
-          defaultValue="Best,&#10;Arup&#10;TripGain" 
+          defaultValue={defaultSignature} 
           className="w-full p-3 rounded-md border border-gray-300 text-sm focus:ring-2 focus:ring-[#F16F21] outline-none font-mono"
         />
       </div>

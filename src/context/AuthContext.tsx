@@ -76,7 +76,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const switchUser = async (email: string, password = 'password123') => {
-    return login(email, password);
+    const result = await login(email, password);
+    if (result.success) {
+      sessionStorage.clear();
+      // Force page reload to flush in-memory React state and fresh-load user workspace
+      window.location.reload();
+    }
+    return result;
   };
 
   const logout = () => {
@@ -84,6 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null);
     localStorage.removeItem('tg_auth_token');
     localStorage.removeItem('tg_auth_user');
+    sessionStorage.clear();
     document.cookie = 'auth_session=; max-age=0; path=/; SameSite=Lax';
     router.push('/login');
   };

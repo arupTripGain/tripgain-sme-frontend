@@ -736,14 +736,20 @@ export default function UniboxPage() {
                     <span className="text-[11px] font-medium text-slate-400 mr-1 hidden sm:inline">Quick insert:</span>
                     <button 
                       type="button" 
-                      onClick={() => setReplyText("Hi " + (threadDetails?.contact?.fullName?.split(' ')[0] || 'there') + ",\n\nThanks for reaching back out! We'd be glad to walk you through a brief 10-minute demo to see how TripGain can streamline travel bookings and corporate approvals for your team.\n\nWould you have 10 minutes open tomorrow or Wednesday?\n\nBest regards,\nArup")} 
+                      onClick={() => {
+                        const senderSign = user?.name?.split(' ')[0] || 'Team';
+                        setReplyText("Hi " + (threadDetails?.contact?.fullName?.split(' ')[0] || 'there') + ",\n\nThanks for reaching back out! We'd be glad to walk you through a brief 10-minute demo to see how TripGain can streamline travel bookings and corporate approvals for your team.\n\nWould you have 10 minutes open tomorrow or Wednesday?\n\nBest regards,\n" + senderSign);
+                      }} 
                       className="px-2.5 py-1 hover:bg-slate-200/70 bg-slate-100 rounded-md text-xs font-medium text-slate-600 transition-colors"
                     >
                       + Propose Demo
                     </button>
                     <button 
                       type="button" 
-                      onClick={() => setReplyText("Hi " + (threadDetails?.contact?.fullName?.split(' ')[0] || 'there') + ",\n\nHere is our onboarding link where you can explore the platform right away:\nhttps://neo.tripgain.com/register-your-sme\n\nLet me know if you run into any questions while exploring!\n\nBest,\nArup")} 
+                      onClick={() => {
+                        const senderSign = user?.name?.split(' ')[0] || 'Team';
+                        setReplyText("Hi " + (threadDetails?.contact?.fullName?.split(' ')[0] || 'there') + ",\n\nHere is our onboarding link where you can explore the platform right away:\nhttps://neo.tripgain.com/register-your-sme\n\nLet me know if you run into any questions while exploring!\n\nBest,\n" + senderSign);
+                      }} 
                       className="px-2.5 py-1 hover:bg-slate-200/70 bg-slate-100 rounded-md text-xs font-medium text-slate-600 transition-colors"
                     >
                       + Send Link

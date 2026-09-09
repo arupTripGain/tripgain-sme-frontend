@@ -2,21 +2,30 @@
 
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 
 import { Users, Send, Reply, CheckCircle, UserPlus, UserMinus } from 'lucide-react';
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     apiFetch('/api/dashboard')
       .then(res => res.json())
       .then(d => {
         setData(d);
         setLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to load dashboard:', err);
+        setLoading(false);
       });
-  }, []);
+  }, [user?.id]);
+
+  const firstName = user?.name ? user.name.split(' ')[0] : 'there';
 
   if (loading) return <div className="p-8 text-center text-muted-foreground">Loading Dashboard...</div>;
 
@@ -32,7 +41,7 @@ export default function Dashboard() {
   return (
     <div className="flex-1 p-8 w-full max-w-6xl mx-auto">
       <div className="mb-8">
-        <h1 className="font-heading text-3xl font-bold text-secondary">Good morning, Arup</h1>
+        <h1 className="font-heading text-3xl font-bold text-secondary">Good morning, {firstName}</h1>
         <p className="text-muted-foreground mt-1">Your outreach overview</p>
       </div>
 
