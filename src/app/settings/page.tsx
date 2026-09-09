@@ -13,12 +13,22 @@ import {
   ListOrdered, 
   Activity, 
   ShieldAlert, 
-  Link as LinkIcon 
+  Link as LinkIcon,
+  Sparkles,
+  Key,
+  Eye,
+  EyeOff,
+  CheckCircle2,
+  ExternalLink,
+  Trash2,
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
 
 const TABS = [
   { id: 'general', label: 'General', icon: SettingsIcon },
   { id: 'profile', label: 'Profile', icon: User },
+  { id: 'ai', label: 'AI / Gemini', icon: Sparkles },
   { id: 'mailboxes', label: 'Mailboxes', icon: Mail },
   { id: 'sending', label: 'Sending', icon: Send },
   { id: 'email', label: 'Email', icon: FileText },
@@ -80,13 +90,14 @@ export default function SettingsPage() {
             >
               {activeTab === 'general' && <GeneralSettings />}
               {activeTab === 'profile' && <ProfileSettings />}
+              {activeTab === 'ai' && <AISettings />}
               {activeTab === 'mailboxes' && <MailboxesSettings />}
               {activeTab === 'sending' && <SendingSettings />}
               {activeTab === 'email' && <EmailSettings />}
               {activeTab === 'sequences' && <SequencesSettings />}
               {activeTab === 'tracking' && <TrackingSettings />}
               {activeTab === 'suppression' && <SuppressionSettings />}
-              {activeTab === 'integrations' && <IntegrationsSettings />}
+              {activeTab === 'integrations' && <IntegrationsSettings onNavigateTab={setActiveTab} />}
             </div>
           </div>
 
@@ -576,7 +587,16 @@ function SuppressionSettings() {
   );
 }
 
-function IntegrationsSettings() {
+function IntegrationsSettings({ onNavigateTab }: { onNavigateTab?: (tab: string) => void }) {
+  const [aiStatus, setAiStatus] = useState<any>(null);
+
+  useEffect(() => {
+    apiFetch('/api/settings/ai')
+      .then(res => res.json())
+      .then(data => setAiStatus(data))
+      .catch(() => {});
+  }, []);
+
   return (
     <div className="space-y-6 animate-in fade-in">
       <h2 className="text-xl font-bold" style={{ color: '#14385F' }}>Integrations</h2>
@@ -621,23 +641,40 @@ function IntegrationsSettings() {
         <div className="border border-gray-200 rounded-lg p-5 bg-white">
           <div className="flex justify-between items-start mb-4">
             <div>
-              <h3 className="font-bold text-gray-900">AI Provider</h3>
-              <div className="text-xs text-gray-500 mt-1">Classification & Drafting</div>
+              <h3 className="font-bold text-gray-900">AI Personalization (Gemini)</h3>
+              <div className="text-xs text-gray-500 mt-1">Bring Your Own Key (BYOK)</div>
             </div>
-            <span className="flex items-center gap-1.5 bg-green-50 text-green-700 px-2 py-1 rounded text-xs font-bold border border-green-100">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Connected
-            </span>
+            {aiStatus?.configured ? (
+              <span className="flex items-center gap-1.5 bg-green-50 text-green-700 px-2 py-1 rounded text-xs font-bold border border-green-100">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Connected
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 bg-amber-50 text-amber-700 px-2 py-1 rounded text-xs font-bold border border-amber-200">
+                <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span> Not Configured
+              </span>
+            )}
           </div>
 
           <div className="space-y-3 text-sm text-gray-600">
             <div className="flex justify-between border-b border-gray-50 pb-2">
-              <span>Model:</span>
-              <span className="font-medium text-gray-900">TripGain Internal</span>
+              <span>Status:</span>
+              <span className="font-medium text-gray-900">
+                {aiStatus?.configured ? `Connected (•••• ${aiStatus.keyLast4})` : 'Needs API Key'}
+              </span>
+            </div>
+            <div className="flex justify-between border-b border-gray-50 pb-2">
+              <span>Models:</span>
+              <span className="font-medium text-gray-900">Gemini 2.5 Flash / 1.5 Flash</span>
             </div>
           </div>
           
           <div className="mt-4 pt-4 border-t border-gray-100 flex gap-2">
-            <button className="text-xs font-semibold px-3 py-1.5 border border-gray-200 rounded hover:bg-gray-50">Configure</button>
+            <button 
+              onClick={() => onNavigateTab?.('ai')}
+              className="text-xs font-semibold px-3 py-1.5 border rounded hover:bg-gray-50 text-primary border-[#E0C0B2]"
+            >
+              Configure Key
+            </button>
           </div>
         </div>
 
@@ -645,3 +682,323 @@ function IntegrationsSettings() {
     </div>
   );
 }
+
+function AISettings() {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [status, setStatus] = useState<{
+    configured: boolean;
+    keyLast4: string | null;
+    provider: string;
+    lastUsedAt: string | null;
+    usageToday: number;
+    fallbackAvailable: boolean;
+    fallbackDailyLimit: number;
+    fallbackUsedToday: number;
+  } | null>(null);
+
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [showKey, setShowKey] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const fetchStatus = async () => {
+    try {
+      setLoading(true);
+      const res = await apiFetch('/api/settings/ai');
+      if (res.ok) {
+        const data = await res.json();
+        setStatus(data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch AI settings', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStatus();
+  }, [user?.id]);
+
+  const handleSaveKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanKey = apiKeyInput.trim();
+    if (!cleanKey) {
+      setErrorMessage('Please enter a valid Gemini API key.');
+      return;
+    }
+    setSaving(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await apiFetch('/api/settings/ai/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: cleanKey }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setApiKeyInput(''); // Zero out memory state immediately
+        setIsEditing(false);
+        setSuccessMessage('Gemini API key validated and securely connected!');
+        await fetchStatus();
+      } else {
+        setErrorMessage(data.error || 'Failed to validate API key with Google Gemini.');
+      }
+    } catch (e: any) {
+      setErrorMessage(e.message || 'Network error while connecting API key.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveKey = async () => {
+    if (!confirm('Are you sure you want to disconnect your Gemini API key? AI personalization will be disabled until a new key is added.')) {
+      return;
+    }
+    setRemoving(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await apiFetch('/api/settings/ai/gemini', {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSuccessMessage('Gemini API key disconnected successfully.');
+        setIsEditing(false);
+        setApiKeyInput('');
+        await fetchStatus();
+      } else {
+        setErrorMessage(data.error || 'Failed to remove API key.');
+      }
+    } catch (e: any) {
+      setErrorMessage(e.message || 'Error removing API key.');
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: '#14385F' }}>
+            <Sparkles className="w-5 h-5 text-[#F16F21]" />
+            AI / Gemini Configuration
+          </h2>
+          <p className="text-sm text-gray-600 mt-1">
+            Bring Your Own Key (BYOK) for Google Gemini. Power AI-driven prospect research and personalized icebreakers.
+          </p>
+        </div>
+      </div>
+
+      {/* Notifications */}
+      {errorMessage && (
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-3 text-rose-900 text-sm">
+          <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-semibold">Configuration Error</p>
+            <p className="mt-0.5 text-rose-800">{errorMessage}</p>
+          </div>
+          <button onClick={() => setErrorMessage(null)} className="text-rose-500 hover:text-rose-700 font-bold">&times;</button>
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3 text-green-900 text-sm">
+          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-semibold">Success</p>
+            <p className="mt-0.5 text-green-800">{successMessage}</p>
+          </div>
+          <button onClick={() => setSuccessMessage(null)} className="text-green-500 hover:text-green-700 font-bold">&times;</button>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="p-8 text-center text-sm text-gray-500 flex items-center justify-center gap-2">
+          <RefreshCw className="w-4 h-4 animate-spin text-[#F16F21]" /> Loading AI configuration...
+        </div>
+      ) : status?.configured && !isEditing ? (
+        /* CONNECTED STATE */
+        <div className="space-y-6">
+          <div className="border rounded-xl p-6 bg-gradient-to-r from-green-50/50 to-white border-green-200 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center text-green-700">
+                  <Key className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-gray-900">Google Gemini API Key</h3>
+                    <span className="inline-flex items-center gap-1 text-xs font-bold text-green-700 bg-green-100 px-2.5 py-0.5 rounded-full">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Connected
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">Encrypted with AES-256 at rest</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setIsEditing(true);
+                    setApiKeyInput('');
+                    setErrorMessage(null);
+                    setSuccessMessage(null);
+                  }}
+                  className="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+                >
+                  Replace Key
+                </button>
+                <button
+                  onClick={handleRemoveKey}
+                  disabled={removing}
+                  className="px-3.5 py-2 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100 transition-colors flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  {removing ? 'Disconnecting...' : 'Disconnect'}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 text-sm">
+              <div className="p-3 bg-white rounded-lg border border-gray-100">
+                <div className="text-xs text-gray-500 font-medium">Active Key Ending</div>
+                <div className="font-mono font-bold text-gray-800 mt-1 flex items-center gap-1.5">
+                  <span className="text-gray-400">•••• •••• ••••</span> {status.keyLast4}
+                </div>
+              </div>
+              <div className="p-3 bg-white rounded-lg border border-gray-100">
+                <div className="text-xs text-gray-500 font-medium">Requests Today</div>
+                <div className="font-bold text-gray-800 mt-1">
+                  {status.usageToday} {status.usageToday === 1 ? 'call' : 'calls'}
+                </div>
+              </div>
+              <div className="p-3 bg-white rounded-lg border border-gray-100">
+                <div className="text-xs text-gray-500 font-medium">Last Used</div>
+                <div className="text-xs font-semibold text-gray-700 mt-1">
+                  {status.lastUsedAt ? new Date(status.lastUsedAt).toLocaleString() : 'Never used yet'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Admin Platform Quota Info (if available) */}
+          {status.fallbackAvailable && (
+            <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-center justify-between">
+              <div>
+                <span className="font-bold">TripGain Platform Gemini Fallback Active:</span> You are an authorized admin. If your personal key ever reaches rate limits, company fallback is capped at {status.fallbackDailyLimit} reqs/day ({status.fallbackUsedToday} used today).
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* DISCONNECTED OR EDITING STATE */
+        <div className="border rounded-xl p-6 bg-white border-[#E0C0B2] shadow-sm space-y-6">
+          <div className="bg-amber-50/60 border border-amber-200/80 rounded-lg p-4 text-xs text-amber-900 leading-relaxed">
+            <p className="font-semibold text-amber-950 text-sm mb-1">
+              {isEditing ? 'Replace your Gemini API Key' : 'Connect your Gemini API Key to enable AI'}
+            </p>
+            <p>
+              TripGain uses Google Gemini to automatically analyze prospect companies and generate factual, high-converting outreach icebreakers.
+              Bring your own Gemini API key to run unlimited personalization directly against your Google Cloud account with zero markup.
+            </p>
+            <div className="mt-3">
+              <a
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 font-bold text-[#F16F21] hover:underline"
+              >
+                Get your Gemini API Key at Google AI Studio <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+
+          <form onSubmit={handleSaveKey} className="space-y-4">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold text-gray-700">
+                  Google Gemini API Key
+                </label>
+                <span className="text-xs text-gray-500">Starts with AIzaSy...</span>
+              </div>
+              <div className="relative">
+                <input
+                  type={showKey ? 'text' : 'password'}
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  placeholder="AIzaSy..."
+                  autoComplete="off"
+                  spellCheck="false"
+                  disabled={saving}
+                  className="w-full h-11 px-3.5 pr-10 rounded-lg border border-gray-300 text-sm font-mono focus:ring-2 focus:ring-[#F16F21] outline-none transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowKey(!showKey)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  tabIndex={-1}
+                >
+                  {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                🔒 Zero Key Exposure: Your key is AES-256 encrypted at rest, used only for your outreach requests, and is never logged or shown in plaintext.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="submit"
+                disabled={saving || !apiKeyInput.trim()}
+                className="px-5 py-2.5 rounded-lg font-bold text-white transition-opacity hover:opacity-90 shadow-sm text-sm disabled:opacity-50 flex items-center gap-2"
+                style={{ backgroundColor: '#F16F21' }}
+              >
+                {saving ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Validating with Google...
+                  </>
+                ) : (
+                  'Validate & Connect Key'
+                )}
+              </button>
+
+              {isEditing && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditing(false);
+                    setApiKeyInput('');
+                    setErrorMessage(null);
+                  }}
+                  disabled={saving}
+                  className="px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Google Billing & Compliance Notice */}
+      <div className="p-4 rounded-lg bg-gray-50 border border-gray-200 text-xs text-gray-600 leading-relaxed">
+        <strong className="text-gray-900 block mb-0.5">Google AI Studio Billing & Usage</strong>
+        API usage is billed directly to your Google account according to your Google AI Studio plan. TripGain does not mark up API costs.
+        Free tier keys are subject to Google's standard rate limits (15 RPM).
+      </div>
+    </div>
+  );
+}
+

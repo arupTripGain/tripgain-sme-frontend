@@ -86,7 +86,13 @@ export default function ListDashboardPage() {
           progressPct: 0
         });
       } else {
-        alert(data.error || 'Failed to start personalization for list');
+        if (data.code === 'AI_PROVIDER_NOT_CONFIGURED') {
+          if (confirm(`${data.error}\n\nWould you like to go to Settings to connect your Gemini API key now?`)) {
+            window.location.href = '/settings';
+          }
+        } else {
+          alert(data.error || 'Failed to start personalization for list');
+        }
       }
     } catch (e: any) {
       console.error(e);
@@ -108,7 +114,13 @@ export default function ListDashboardPage() {
       if (res.ok) {
         fetchListData();
       } else {
-        alert(data.error || 'Failed to personalize contact');
+        if (data.code === 'AI_PROVIDER_NOT_CONFIGURED') {
+          if (confirm(`${data.error}\n\nWould you like to go to Settings to connect your Gemini API key now?`)) {
+            window.location.href = '/settings';
+          }
+        } else {
+          alert(data.error || 'Failed to personalize contact');
+        }
       }
     } catch (e: any) {
       console.error(e);

@@ -277,7 +277,13 @@ export default function CampaignComposerPage() {
       setAiPrompt('');
     } catch (err: any) {
       console.error(err);
-      alert(err?.message || 'Error generating AI template');
+      if (err?.message?.includes('Gemini') || err?.message?.includes('provider') || err?.message?.includes('key') || err?.code === 'AI_PROVIDER_NOT_CONFIGURED') {
+        if (confirm(`${err.message || 'A Gemini API key is required.'}\n\nWould you like to open Settings to connect your Gemini API key now?`)) {
+          window.location.href = '/settings';
+        }
+      } else {
+        alert(err?.message || 'Error generating AI template');
+      }
     } finally {
       setAiLoading(false);
     }

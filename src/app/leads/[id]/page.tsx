@@ -378,6 +378,22 @@ export default function LeadProfilePage() {
               </div>
 
               <div className="p-5 space-y-4">
+                {personalizationError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-900 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-semibold">AI Personalization Error</p>
+                      <p className="mt-0.5 text-rose-800">{personalizationError}</p>
+                      {(personalizationError.includes('Settings') || personalizationError.includes('key') || personalizationError.includes('Gemini')) && (
+                        <Link href="/settings" className="inline-block mt-1.5 font-bold text-[#F16F21] underline hover:opacity-80">
+                          Connect Gemini Key in Settings &rarr;
+                        </Link>
+                      )}
+                    </div>
+                    <button onClick={() => setPersonalizationError(null)} className="text-rose-400 hover:text-rose-600 font-bold">&times;</button>
+                  </div>
+                )}
+
                 {personalizing ? (
                   <div className="p-6 text-center space-y-3 bg-muted/20 rounded-lg border border-dashed border-border animate-pulse">
                     <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
