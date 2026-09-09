@@ -61,18 +61,52 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
         <div className="rounded-lg border border-border bg-card shadow-sm p-6">
-          <h2 className="font-heading text-lg font-bold text-secondary mb-4">Today's Activity</h2>
-          <div className="space-y-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-heading text-lg font-bold text-secondary">Today's Activity</h2>
+            {data?.recentActivity?.length > 0 && (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                {data.recentActivity.length} event{data.recentActivity.length > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          <div className="space-y-3">
             {data?.recentActivity?.length === 0 ? (
               <div className="text-sm text-muted-foreground">No recent activity today.</div>
             ) : (
-              data.recentActivity.map((act: any, i: number) => (
-                <div key={i} className="text-sm border-b border-border pb-2 last:border-0 last:pb-0 flex flex-col">
-                  <span className="font-medium text-secondary">{act.action}</span>
-                  <span className="text-muted-foreground">{act.description}</span>
-                  <span className="text-xs text-muted-foreground mt-1">{new Date(act.createdAt).toLocaleTimeString()}</span>
-                </div>
-              ))
+              data.recentActivity.map((act: any, i: number) => {
+                const getBadgeStyle = (action: string) => {
+                  switch (action) {
+                    case 'Email Opened':
+                      return 'bg-blue-50 text-blue-700 border-blue-200';
+                    case 'Link Clicked':
+                      return 'bg-cyan-50 text-cyan-700 border-cyan-200';
+                    case 'Reply Received':
+                      return 'bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold';
+                    case 'Email Sent':
+                      return 'bg-purple-50 text-purple-700 border-purple-200';
+                    case 'Lead Enrolled':
+                      return 'bg-amber-50 text-amber-700 border-amber-200';
+                    case 'Email Bounced':
+                      return 'bg-rose-50 text-rose-700 border-rose-200';
+                    default:
+                      return 'bg-muted text-muted-foreground border-border';
+                  }
+                };
+
+                return (
+                  <div key={i} className="text-sm border-b border-border pb-2.5 last:border-0 last:pb-0 flex flex-col gap-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${getBadgeStyle(act.action)}`}>
+                        {act.action}
+                      </span>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {new Date(act.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <span className="text-xs text-muted-foreground break-words leading-relaxed">{act.description}</span>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
