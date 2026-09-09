@@ -1750,14 +1750,14 @@ export default function CampaignDashboardPage() {
                 </p>
                 <div className="flex items-center gap-3 mt-3 text-xs">
                   <span className="text-muted-foreground">
-                    Step: <strong className="text-secondary">{selectedContactTimeline.enrollment?.currentStep ?? 1}</strong>
+                    Step: <strong className="text-secondary">{selectedContactTimeline.enrollment?.currentStep ?? selectedContactTimeline.engagement?.currentStep ?? 1}</strong>
                   </span>
                   <span className="text-muted-foreground">
-                    Status: <strong className="text-secondary uppercase">{selectedContactTimeline.enrollment?.status || 'Active'}</strong>
+                    Status: <strong className="text-secondary uppercase">{selectedContactTimeline.enrollment?.status || selectedContactTimeline.engagement?.status || 'Active'}</strong>
                   </span>
-                  {selectedContactTimeline.enrollment?.stopReason && (
+                  {(selectedContactTimeline.enrollment?.stopReason || selectedContactTimeline.engagement?.stopReason) && (
                     <span className="text-red-600 font-semibold">
-                      [{selectedContactTimeline.enrollment.stopReason}]
+                      [{selectedContactTimeline.enrollment?.stopReason || selectedContactTimeline.engagement?.stopReason}]
                     </span>
                   )}
                 </div>
@@ -1786,7 +1786,14 @@ export default function CampaignDashboardPage() {
               </div>
               <div className="bg-card p-2 rounded-lg border border-border">
                 <div className="text-[10px] uppercase font-bold text-muted-foreground">Sent Steps</div>
-                <div className="text-base font-bold text-secondary">{selectedContactTimeline.messages?.length ?? 0}</div>
+                <div className="text-base font-bold text-secondary">
+                  {selectedContactTimeline.messages?.length ||
+                   selectedContactTimeline.events?.filter((e: any) => {
+                     const t = String(e.type || e.eventType || '').toUpperCase();
+                     return t.includes('SENT') || t.includes('MESSAGE');
+                   }).length ||
+                   (selectedContactTimeline.engagement?.lastSentAt ? 1 : 0)}
+                </div>
               </div>
             </div>
 
@@ -1802,86 +1809,135 @@ export default function CampaignDashboardPage() {
                 </div>
               ) : (
                 <div className="relative border-l-2 border-[#e0c0b2] ml-3 space-y-6">
-                  {/* Unified Events Stream (Messages + Events sorted desc) */}
                   {(() => {
                     const allFeedItems: any[] = [];
-                    (selectedContactTimeline.messages || []).forEach((m: any) => {
-                      if (m.sentAt) {
-                        allFeedItems.push({
-                          type: 'message_sent',
-                          timestamp: new Date(m.sentAt),
-                          title: `Email Dispatched (Step ${m.sequenceStep?.stepNumber || 1})`,
-                          details: m.subject || 'Threaded Follow-up (No Subject)',
-                          extra: m.status,
-                          icon: Send,
-                          iconColor: 'bg-[#14385F] text-white'
-                        });
-                      }
-                    });
-                    (selectedContactTimeline.events || []).forEach((e: any) => {
-                      const et = e.eventType;
-                      let title = 'Event';
+                    const seenItemIds = new Set<string>();
+
+                    // 1. Process structured backend events (which include SENT, OPENED, CLICKED, REPLIED, BOUNCED, SCHEDULED)
+                    (selectedContactTimeline.events || []).forEach((e: any, idx: number) => {
+                      const id = e.id || `ev-${idx}`;
+                      if (seenItemIds.has(id)) return;
+                      seenItemIds.add(id);
+
+                      const rawType = String(e.type || e.eventType || '').toUpperCase();
+                      const rawTime = e.timestamp || e.eventAt || e.createdAt || e.sentAt;
+                      const dateObj = rawTime ? new Date(rawTime) : null;
+                      const isValidDate = dateObj && !isNaN(dateObj.getTime());
+
                       let icon = Eye;
                       let iconColor = 'bg-amber-500 text-white';
-                      let details = '';
+                      let defaultTitle = 'Activity Event';
 
-                      if (et === 'opened' || et === 'email.opened') {
-                        title = 'Email Opened';
+                      if (rawType.includes('SENT') || rawType.includes('MESSAGE')) {
+                        icon = Send;
+                        iconColor = 'bg-[#14385F] text-white';
+                        defaultTitle = 'Email Dispatched';
+                      } else if (rawType.includes('OPEN')) {
                         icon = Eye;
                         iconColor = 'bg-amber-500 text-white';
-                        details = `Recipient opened email (Step ${e.message?.sequenceStep?.stepNumber || '1'})`;
-                      } else if (et === 'clicked' || et === 'email.clicked') {
-                        title = 'Link Clicked';
+                        defaultTitle = 'Tracked Email Open';
+                      } else if (rawType.includes('CLICK')) {
                         icon = MousePointerClick;
                         iconColor = 'bg-blue-600 text-white';
-                        details = e.eventData?.url || e.metadata?.url || 'Tracked link clicked in email';
-                      } else if (et === 'replied' || et === 'email.replied') {
-                        title = 'Reply Received';
+                        defaultTitle = 'Link Clicked';
+                      } else if (rawType.includes('REPL')) {
                         icon = MessageSquare;
                         iconColor = 'bg-purple-600 text-white';
-                        details = 'Prospect replied to email sequence';
-                      } else if (et === 'bounced' || et === 'email.bounced') {
-                        title = 'Email Bounced';
+                        defaultTitle = 'Reply Received';
+                      } else if (rawType.includes('SCHED')) {
+                        icon = Clock;
+                        iconColor = 'bg-slate-600 text-white';
+                        defaultTitle = 'Step Scheduled';
+                      } else if (rawType.includes('BOUNC')) {
                         icon = AlertCircle;
                         iconColor = 'bg-red-600 text-white';
-                        details = 'Delivery failed / mailbox bounce recorded';
-                      } else if (et === 'unsubscribed') {
-                        title = 'Unsubscribed';
+                        defaultTitle = 'Email Bounced';
+                      } else if (rawType.includes('UNSUB')) {
                         icon = ShieldCheck;
                         iconColor = 'bg-gray-700 text-white';
-                        details = 'Prospect requested unenrollment';
+                        defaultTitle = 'Unsubscribed';
                       }
 
                       allFeedItems.push({
-                        type: et,
-                        timestamp: new Date(e.eventAt || e.createdAt),
-                        title,
-                        details,
-                        extra: null,
+                        id,
+                        dateObj,
+                        formattedDate: isValidDate
+                          ? dateObj.toLocaleString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true
+                            })
+                          : 'Recent Activity',
+                        title: e.title || defaultTitle,
+                        description: e.description || e.details || (
+                          rawType.includes('OPEN') ? 'Recipient opened the email message.' :
+                          rawType.includes('REPL') ? 'Recipient sent an inbound response.' :
+                          rawType.includes('CLICK') ? 'Tracked destination link was clicked.' : ''
+                        ),
                         icon,
                         iconColor
                       });
                     });
 
-                    allFeedItems.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+                    // 2. Fallback: If messages are provided separately and not yet in seenItemIds
+                    (selectedContactTimeline.messages || []).forEach((m: any, idx: number) => {
+                      const msgId = `msg-${m.id || idx}`;
+                      if (seenItemIds.has(msgId) || (m.id && seenItemIds.has(m.id))) return;
+                      seenItemIds.add(msgId);
 
-                    return allFeedItems.map((item, i) => {
+                      const rawTime = m.sentAt || m.createdAt;
+                      const dateObj = rawTime ? new Date(rawTime) : null;
+                      const isValidDate = dateObj && !isNaN(dateObj.getTime());
+
+                      allFeedItems.push({
+                        id: msgId,
+                        dateObj,
+                        formattedDate: isValidDate
+                          ? dateObj.toLocaleString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true
+                            })
+                          : 'Recent Activity',
+                        title: `Step ${m.sequenceStep?.stepNumber || 1} Email Sent`,
+                        description: m.subject ? `Subject: "${m.subject}" via ${m.fromEmail || 'mailbox'}` : `Threaded follow-up sent via ${m.fromEmail || 'mailbox'}`,
+                        icon: Send,
+                        iconColor: 'bg-[#14385F] text-white'
+                      });
+                    });
+
+                    // Sort chronologically descending (latest first)
+                    allFeedItems.sort((a, b) => {
+                      const timeA = a.dateObj ? a.dateObj.getTime() : 0;
+                      const timeB = b.dateObj ? b.dateObj.getTime() : 0;
+                      return timeB - timeA;
+                    });
+
+                    return allFeedItems.map((item) => {
                       const Icon = item.icon;
                       return (
-                        <div key={i} className="relative pl-6">
+                        <div key={item.id} className="relative pl-6">
                           <div className={`absolute -left-2.5 top-1 w-5 h-5 rounded-full flex items-center justify-center ${item.iconColor} ring-4 ring-card text-xs`}>
                             <Icon className="w-2.5 h-2.5" />
                           </div>
                           <div className="bg-card border border-border rounded-xl p-3.5 shadow-2xs">
                             <div className="flex items-center justify-between gap-2">
                               <span className="font-bold text-secondary text-xs">{item.title}</span>
-                              <span className="text-[10px] text-muted-foreground">
-                                {item.timestamp.toLocaleString()}
+                              <span className="text-[10px] text-muted-foreground font-medium">
+                                {item.formattedDate}
                               </span>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1 break-words leading-relaxed">
-                              {item.details}
-                            </p>
+                            {item.description && (
+                              <p className="text-xs text-muted-foreground mt-1 break-words leading-relaxed">
+                                {item.description}
+                              </p>
+                            )}
                           </div>
                         </div>
                       );
