@@ -12,7 +12,7 @@ import {
   UserCheck, AlertTriangle, ShieldCheck
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { TemplateEngine } from '@/lib/templateEngine';
+import { TemplateEngine, buildCanonicalLeadContext } from '@/lib/templateEngine';
 
 export default function CampaignDashboardPage() {
   const { id } = useParams();
@@ -38,17 +38,9 @@ export default function CampaignDashboardPage() {
   // Sequence Preview State
   const [previewStep, setPreviewStep] = useState<any>(null);
   const [contacts, setContacts] = useState<any[]>([]);
-  const [previewLead, setPreviewLead] = useState<any>({
-    firstName: 'Alex',
-    lastName: 'Morgan',
-    email: 'alex.morgan@acmetech.io',
-    title: 'Director of Growth',
-    companyName: 'Acme Technologies',
-    website: 'acmetech.io',
-    city: 'Bengaluru',
-    senderName: 'Arup Nirala',
-    senderCompany: 'TripGain'
-  });
+  const [previewLead, setPreviewLead] = useState<any>(
+    buildCanonicalLeadContext(null, 'Arup Nirala', 'TripGain')
+  );
 
   // Scheduler and modal state
   const [ticking, setTicking] = useState(false);
@@ -130,36 +122,11 @@ export default function CampaignDashboardPage() {
         const contactList = Array.isArray(cData) ? cData : (cData.contacts || []);
         setContacts(contactList);
 
+        const sender = campData?.senderMailboxes?.[0]?.split('@')[0] || 'Arup Nirala';
         if (loadedEnrollments.length > 0) {
-          const lead = loadedEnrollments[0];
-          const pers = lead.personalizedLine || lead.personalization || '';
-          setPreviewLead({
-            firstName: lead.firstName || 'there',
-            lastName: lead.lastName || '',
-            email: lead.email || 'lead@example.com',
-            title: lead.title || 'Decision Maker',
-            companyName: lead.company || 'Company',
-            city: lead.city || '',
-            personalization: pers,
-            personalizedLine: pers,
-            senderName: campData?.senderMailboxes?.[0]?.split('@')[0] || 'Arup Nirala',
-            senderCompany: 'TripGain'
-          });
+          setPreviewLead(buildCanonicalLeadContext(loadedEnrollments[0], sender, 'TripGain'));
         } else if (contactList.length > 0) {
-          const contact = contactList[0];
-          const pers = contact.personalizedLine || contact.personalization || contact.personalizationTrigger || '';
-          setPreviewLead({
-            firstName: contact.firstName || 'there',
-            lastName: contact.lastName || '',
-            email: contact.emails?.[0]?.email || contact.email || 'lead@example.com',
-            title: contact.jobTitle || 'Executive',
-            companyName: contact.organization?.name || 'Acme Technologies',
-            city: contact.city || 'Bengaluru',
-            personalization: pers,
-            personalizedLine: pers,
-            senderName: campData?.senderMailboxes?.[0]?.split('@')[0] || 'Arup Nirala',
-            senderCompany: 'TripGain'
-          });
+          setPreviewLead(buildCanonicalLeadContext(contactList[0], sender, 'TripGain'));
         }
       }
       
@@ -1594,41 +1561,15 @@ export default function CampaignDashboardPage() {
                     className="w-full h-10 px-3 rounded-lg border border-input focus:ring-1 focus:ring-primary outline-none text-sm bg-background text-secondary"
                     onChange={(e) => {
                       const selectedId = e.target.value;
+                      const sender = campaign?.senderMailboxes?.[0]?.split('@')[0] || 'Arup Nirala';
                       const enrolled = enrollments.find(l => l.id === selectedId || l.contactId === selectedId);
                       if (enrolled) {
-                        const pers = enrolled.personalizedLine || enrolled.personalization || '';
-                        setPreviewLead({
-                          firstName: enrolled.firstName || 'there',
-                          lastName: enrolled.lastName || '',
-                          email: enrolled.email || 'lead@example.com',
-                          title: enrolled.title || 'Decision Maker',
-                          companyName: enrolled.company || 'Company',
-                          city: enrolled.city || '',
-                          personalization: pers,
-                          personalizedLine: pers,
-                          senderName: campaign?.senderMailboxes?.[0]?.split('@')[0] || 'Arup Nirala',
-                          senderCompany: 'TripGain'
-                        });
+                        setPreviewLead(buildCanonicalLeadContext(enrolled, sender, 'TripGain'));
                         return;
                       }
                       const c = contacts.find(contact => contact.id === selectedId);
                       if (c) {
-                        const pers = c.personalizedLine || c.personalization || c.personalizationTrigger || '';
-                        setPreviewLead({
-                          firstName: c.firstName || '',
-                          lastName: c.lastName || '',
-                          email: c.emails?.[0]?.email || c.email || '',
-                          title: c.jobTitle || '',
-                          companyName: c.organization?.name || '',
-                          website: c.organization?.domain || '',
-                          industry: c.organization?.industry || '',
-                          companySize: c.organization?.employeeSize || '',
-                          city: c.city || '',
-                          personalization: pers,
-                          personalizedLine: pers,
-                          senderName: campaign?.senderMailboxes?.[0]?.split('@')[0] || 'Arup Nirala',
-                          senderCompany: 'TripGain'
-                        });
+                        setPreviewLead(buildCanonicalLeadContext(c, sender, 'TripGain'));
                       }
                     }}
                   >
@@ -1636,7 +1577,7 @@ export default function CampaignDashboardPage() {
                       <optgroup label="Enrolled Campaign Leads">
                         {enrollments.map(e => (
                           <option key={e.id} value={e.id}>
-                            {e.fullName || `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email} ({e.company || 'Lead'})
+                            {e.fullName || `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email} ({e.company || e.companyName || 'Lead'})
                           </option>
                         ))}
                       </optgroup>
@@ -1645,13 +1586,13 @@ export default function CampaignDashboardPage() {
                       <optgroup label="All Workspace Contacts">
                         {contacts.map(c => (
                           <option key={c.id} value={c.id}>
-                            {c.firstName} {c.lastName} ({c.organization?.name || 'Contact'})
+                            {c.firstName} {c.lastName} ({c.companyName || c.organization?.name || 'Contact'})
                           </option>
                         ))}
                       </optgroup>
                     )}
                     {enrollments.length === 0 && contacts.length === 0 && (
-                      <option value="">Sample Lead</option>
+                      <option value="">No leads available</option>
                     )}
                   </select>
                 </div>
@@ -1694,6 +1635,19 @@ export default function CampaignDashboardPage() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                {(() => {
+                  const val = TemplateEngine.validateLeadContext(previewLead);
+                  if (!val.isValid && val.warnings.length > 0) {
+                    return (
+                      <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-900 font-semibold flex items-center gap-2 max-w-3xl">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>{val.warnings.join(' ')}</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
                 <div className="space-y-3 max-w-3xl bg-card border border-border p-5 rounded-xl shadow-sm">
                   <div className="flex items-center gap-4 text-xs">
                     <span className="font-semibold text-muted-foreground w-16">From:</span>

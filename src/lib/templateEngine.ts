@@ -214,6 +214,117 @@ export class TemplateEngine {
 
     return result;
   }
+
+  /**
+   * Defensively validates preview data context to prevent lead cross-contamination.
+   * Disallows fake companies and flags mismatches between personalization and companyName.
+   */
+  static validateLeadContext(data: Record<string, any>): LeadValidationResult {
+    const warnings: string[] = [];
+    if (!data) return { isValid: true, warnings };
+
+    const company = (data.companyName || '').trim();
+    const pers = (data.personalization || data.personalizedLine || '').trim();
+
+    // Check 1: Disallow legacy mock/fake companies in real campaign previews
+    const disallowedMockCompanies = ['acme technologies', 'acme', 'test company', 'example corp'];
+    if (disallowedMockCompanies.includes(company.toLowerCase())) {
+      warnings.push(`Disallowed mock company detected in preview context: "${company}".`);
+    }
+
+    // Check 2: Cross-check personalization text for company name conflict
+    if (pers && company) {
+      const introMatch = pers.match(/(?:I noticed that|At|I saw that|Following)\s+([A-Z0-9][A-Za-z0-9\s&.\-]{1,30}?)\s+(?:provides|builds|delivers|offers|is|specializes|operates|focuses)/i);
+      if (introMatch && introMatch[1]) {
+        const referencedCompany = introMatch[1].trim();
+        const normRef = referencedCompany.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const normComp = company.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (normRef.length > 2 && normComp.length > 2 && !normRef.includes(normComp) && !normComp.includes(normRef)) {
+          warnings.push(`Potential company mismatch: Personalization mentions "${referencedCompany}" but {{companyName}} resolved to "${company}".`);
+        }
+      }
+    }
+
+    return {
+      isValid: warnings.length === 0,
+      warnings
+    };
+  }
 }
+
+export interface LeadValidationResult {
+  isValid: boolean;
+  warnings: string[];
+}
+
+/**
+ * Builds a canonical variable resolution context from a single contact or enrollment object.
+ * Guarantees that all contact, company, and personalization tokens originate from the SAME record.
+ */
+export function buildCanonicalLeadContext(
+  lead: any,
+  senderName: string = 'Arup Nirala',
+  senderCompany: string = 'TripGain'
+): Record<string, string> {
+  if (!lead) {
+    return {
+      firstName: '',
+      lastName: '',
+      email: '',
+      title: '',
+      companyName: '',
+      website: '',
+      industry: '',
+      companySize: '',
+      companyPhone: '',
+      personLinkedinUrl: '',
+      city: '',
+      personalization: '',
+      personalizedLine: '',
+      senderName,
+      senderCompany
+    };
+  }
+
+  const pers = (
+    lead.personalizedLine ||
+    lead.personalization ||
+    lead.personalizationTrigger ||
+    ''
+  ).trim();
+
+  // Canonical companyName: check direct companyName from API first, then enrollment company, then organization relation
+  const company = (
+    lead.companyName ||
+    lead.company ||
+    lead.organization?.name ||
+    ''
+  ).trim();
+
+  const email = (
+    lead.email ||
+    (Array.isArray(lead.emails) ? (lead.emails.find((e: any) => e?.isPrimary)?.email || lead.emails[0]?.email) : '') ||
+    ''
+  ).trim();
+
+  return {
+    firstName: (lead.firstName || '').trim(),
+    lastName: (lead.lastName || '').trim(),
+    email,
+    title: (lead.jobTitle || lead.title || '').trim(),
+    companyName: company,
+    website: (lead.website || lead.organization?.domain || '').trim(),
+    industry: (lead.industry || lead.organization?.industry || '').trim(),
+    companySize: (lead.companySize || lead.organization?.employeeSize || '').trim(),
+    companyPhone: (lead.companyPhone || lead.organization?.phone || '').trim(),
+    personLinkedinUrl: (lead.personLinkedinUrl || lead.linkedinUrl || '').trim(),
+    city: (lead.city || '').trim(),
+    personalization: pers,
+    personalizedLine: pers,
+    senderName: senderName || 'Arup Nirala',
+    senderCompany: senderCompany || 'TripGain'
+  };
+}
+
 
 

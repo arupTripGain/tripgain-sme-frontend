@@ -7,7 +7,7 @@ import { ArrowLeft, Save, Plus, Play, Clock, Mail, Trash2, CheckCircle2, AlertCi
 import dynamic from 'next/dynamic';
 const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
 import 'react-quill-new/dist/quill.snow.css';
-import { TemplateEngine, VARIABLE_REGISTRY } from '@/lib/templateEngine';
+import { TemplateEngine, VARIABLE_REGISTRY, buildCanonicalLeadContext } from '@/lib/templateEngine';
 import { apiFetch } from '@/lib/api';
 
 const quillModules = {
@@ -61,23 +61,9 @@ export default function CampaignComposerPage() {
   const [lists, setLists] = useState<any[]>([]);
   const [eligibility, setEligibility] = useState<any>(null);
   const [previewStep, setPreviewStep] = useState<number | null>(null);
-  const [previewLead, setPreviewLead] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    title: '',
-    companyName: '',
-    website: '',
-    industry: '',
-    companySize: '',
-    companyPhone: '',
-    personLinkedinUrl: '',
-    city: '',
-    personalization: '',
-    personalizedLine: '',
-    senderName: 'Arup',
-    senderCompany: 'TripGain'
-  });
+  const [previewLead, setPreviewLead] = useState<any>(
+    buildCanonicalLeadContext(null, 'Arup', 'TripGain')
+  );
   
   // 1. Settings State
   const [settings, setSettings] = useState({
@@ -155,25 +141,7 @@ export default function CampaignComposerPage() {
         const fetchedContacts = data.contacts || (Array.isArray(data) ? data : []);
         setContacts(fetchedContacts);
         if (fetchedContacts.length > 0) {
-          const c = fetchedContacts[0];
-          const pers = c.personalizedLine || c.personalization || c.personalizationTrigger || '';
-          setPreviewLead({
-            firstName: c.firstName || '',
-            lastName: c.lastName || '',
-            email: c.email || '',
-            title: c.jobTitle || '',
-            companyName: c.companyName || c.organization?.name || '',
-            website: c.website || c.organization?.domain || '',
-            industry: c.industry || c.organization?.industry || '',
-            companySize: c.companySize || c.organization?.employeeSize || '',
-            companyPhone: c.companyPhone || c.organization?.phone || '',
-            personLinkedinUrl: c.linkedinUrl || '',
-            city: c.city || '',
-            personalization: pers,
-            personalizedLine: pers,
-            senderName: 'Arup',
-            senderCompany: 'TripGain'
-          });
+          setPreviewLead(buildCanonicalLeadContext(fetchedContacts[0], 'Arup', 'TripGain'));
         }
       })
       .catch(console.error);
@@ -1271,24 +1239,7 @@ export default function CampaignComposerPage() {
                     onChange={(e) => {
                       const c = contacts.find(contact => contact.id === e.target.value);
                       if (c) {
-                        const pers = c.personalizedLine || c.personalization || c.personalizationTrigger || '';
-                        setPreviewLead({
-                          firstName: c.firstName || '',
-                          lastName: c.lastName || '',
-                          email: c.email || c.emails?.[0]?.email || '',
-                          title: c.jobTitle || '',
-                          companyName: c.companyName || c.organization?.name || '',
-                          website: c.website || c.organization?.domain || '',
-                          industry: c.industry || c.organization?.industry || '',
-                          companySize: c.companySize || c.organization?.employeeSize || '',
-                          companyPhone: c.companyPhone || c.organization?.phone || '',
-                          personLinkedinUrl: c.linkedinUrl || '',
-                          city: c.city || '',
-                          personalization: pers,
-                          personalizedLine: pers,
-                          senderName: 'Arup',
-                          senderCompany: 'TripGain'
-                        });
+                        setPreviewLead(buildCanonicalLeadContext(c, 'Arup', 'TripGain'));
                       }
                     }}
                   >
@@ -1312,7 +1263,7 @@ export default function CampaignComposerPage() {
                     <div key={key}>
                       <p className="text-xs font-semibold text-muted-foreground">{key}</p>
                       <p className={`text-sm font-medium mt-0.5 ${key === 'personalization' && value ? 'text-purple-700 bg-purple-50 p-2.5 rounded-lg border border-purple-200 whitespace-normal text-xs leading-relaxed' : 'text-secondary truncate'}`}>
-                        {value || <span className="text-muted-foreground italic text-xs">none</span>}
+                        {(value as string) || <span className="text-muted-foreground italic text-xs">none</span>}
                       </p>
                     </div>
                   ))}
@@ -1332,6 +1283,19 @@ export default function CampaignComposerPage() {
               </div>
               
               <div className="flex-1 overflow-y-auto p-8 space-y-8">
+                {(() => {
+                  const val = TemplateEngine.validateLeadContext(previewLead);
+                  if (!val.isValid && val.warnings.length > 0) {
+                    return (
+                      <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-900 font-semibold flex items-center gap-2 max-w-3xl">
+                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>{val.warnings.join(' ')}</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
                 {/* Header */}
                 <div className="space-y-5 max-w-3xl">
                   <div className="flex items-center gap-4">
