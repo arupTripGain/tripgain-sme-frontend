@@ -25,6 +25,7 @@ export const VARIABLE_REGISTRY: Record<string, VariableConfig> = {
   personalizedLine: { tag: '{{personalizedLine}}', label: 'Personalization Line', category: 'Personalization', required: false, fallback: null, behavior: 'remove_block' },
   senderName: { tag: '{{senderName}}', label: 'Sender Name', category: 'Sender', required: true, fallback: 'TripGain Team', behavior: 'replace' },
   senderCompany: { tag: '{{senderCompany}}', label: 'Sender Company', category: 'Sender', required: true, fallback: 'TripGain', behavior: 'replace' },
+  unsubscribeLink: { tag: '{{unsubscribeLink}}', label: 'Unsubscribe Link', category: 'Sender', required: false, fallback: '#', behavior: 'replace' },
 };
 
 export interface TemplateValidationResult {
@@ -264,7 +265,8 @@ export interface LeadValidationResult {
 export function buildCanonicalLeadContext(
   lead: any,
   senderName: string = 'Arup Nirala',
-  senderCompany: string = 'TripGain'
+  senderCompany: string = 'TripGain',
+  unsubscribeLink: string = '#'
 ): Record<string, string> {
   if (!lead) {
     return {
@@ -282,7 +284,8 @@ export function buildCanonicalLeadContext(
       personalization: '',
       personalizedLine: '',
       senderName,
-      senderCompany
+      senderCompany,
+      unsubscribeLink
     };
   }
 
@@ -322,7 +325,8 @@ export function buildCanonicalLeadContext(
     personalization: pers,
     personalizedLine: pers,
     senderName: senderName || 'Arup Nirala',
-    senderCompany: senderCompany || 'TripGain'
+    senderCompany: senderCompany || 'TripGain',
+    unsubscribeLink
   };
 }
 
