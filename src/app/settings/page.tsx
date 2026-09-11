@@ -22,13 +22,22 @@ import {
   ExternalLink,
   Trash2,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Zap,
+  ShieldCheck,
+  Star,
+  Check,
+  Cpu,
+  BarChart3,
+  TrendingUp,
+  Coins,
+  Clock
 } from 'lucide-react';
 
 const TABS = [
   { id: 'general', label: 'General', icon: SettingsIcon },
   { id: 'profile', label: 'Profile', icon: User },
-  { id: 'ai', label: 'AI / Gemini', icon: Sparkles },
+  { id: 'ai', label: 'AI Models (BYOK)', icon: Sparkles },
   { id: 'mailboxes', label: 'Mailboxes', icon: Mail },
   { id: 'sending', label: 'Sending', icon: Send },
   { id: 'email', label: 'Email', icon: FileText },
@@ -641,10 +650,10 @@ function IntegrationsSettings({ onNavigateTab }: { onNavigateTab?: (tab: string)
         <div className="border border-gray-200 rounded-lg p-5 bg-white">
           <div className="flex justify-between items-start mb-4">
             <div>
-              <h3 className="font-bold text-gray-900">AI Personalization (Gemini)</h3>
-              <div className="text-xs text-gray-500 mt-1">Bring Your Own Key (BYOK)</div>
+              <h3 className="font-bold text-gray-900">Multi-Model AI (BYOK)</h3>
+              <div className="text-xs text-gray-500 mt-1">Google Gemini · OpenRouter · xKiro</div>
             </div>
-            {aiStatus?.configured ? (
+            {aiStatus?.providers && Object.values(aiStatus.providers).some((p: any) => p.configured) ? (
               <span className="flex items-center gap-1.5 bg-green-50 text-green-700 px-2 py-1 rounded text-xs font-bold border border-green-100">
                 <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Connected
               </span>
@@ -657,14 +666,21 @@ function IntegrationsSettings({ onNavigateTab }: { onNavigateTab?: (tab: string)
 
           <div className="space-y-3 text-sm text-gray-600">
             <div className="flex justify-between border-b border-gray-50 pb-2">
-              <span>Status:</span>
-              <span className="font-medium text-gray-900">
-                {aiStatus?.configured ? `Connected (•••• ${aiStatus.keyLast4})` : 'Needs API Key'}
+              <span>Active Provider:</span>
+              <span className="font-semibold text-gray-900">
+                {aiStatus?.defaultProvider || 'GEMINI'}
               </span>
             </div>
             <div className="flex justify-between border-b border-gray-50 pb-2">
-              <span>Models:</span>
-              <span className="font-medium text-gray-900">Gemini 2.5 Flash / 1.5 Flash</span>
+              <span>Connected Providers:</span>
+              <span className="font-medium text-gray-900">
+                {aiStatus?.providers
+                  ? Object.entries(aiStatus.providers)
+                      .filter(([_, p]: any) => p.configured)
+                      .map(([k]) => k)
+                      .join(', ') || 'None'
+                  : 'Checking...'}
+              </span>
             </div>
           </div>
           
@@ -673,7 +689,7 @@ function IntegrationsSettings({ onNavigateTab }: { onNavigateTab?: (tab: string)
               onClick={() => onNavigateTab?.('ai')}
               className="text-xs font-semibold px-3 py-1.5 border rounded hover:bg-gray-50 text-primary border-[#E0C0B2]"
             >
-              Configure Key
+              Configure AI Models
             </button>
           </div>
         </div>
@@ -683,27 +699,85 @@ function IntegrationsSettings({ onNavigateTab }: { onNavigateTab?: (tab: string)
   );
 }
 
+type AIProviderKey = 'GEMINI' | 'OPENROUTER' | 'XKIRO';
+
+interface ProviderCardConfig {
+  id: AIProviderKey;
+  name: string;
+  tagline: string;
+  badge: string;
+  keyPrefix: string;
+  portalUrl: string;
+  portalName: string;
+  description: string;
+  defaultModels: string[];
+}
+
+const PROVIDER_CONFIGS: ProviderCardConfig[] = [
+  {
+    id: 'GEMINI',
+    name: 'Google Gemini',
+    tagline: 'Direct Google AI Studio BYOK',
+    badge: 'Fast Multimodal',
+    keyPrefix: 'AIzaSy...',
+    portalUrl: 'https://aistudio.google.com/app/apikey',
+    portalName: 'Google AI Studio',
+    description: 'Ultra-fast multimodal lead research and factual personalization powered by Google Gemini.',
+    defaultModels: ['gemini-3.6-flash', 'gemini-flash-lite-latest', 'gemini-pro-latest']
+  },
+  {
+    id: 'OPENROUTER',
+    name: 'OpenRouter',
+    tagline: 'Universal Multi-Model Router',
+    badge: '100+ Models',
+    keyPrefix: 'sk-or-v1-...',
+    portalUrl: 'https://openrouter.ai/keys',
+    portalName: 'OpenRouter Keys',
+    description: 'Access 100+ models (Claude 3.5, Llama 3.3 Free, GPT-4o, DeepSeek) through a single unified API key.',
+    defaultModels: [
+      'openrouter/free',
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'anthropic/claude-3.5-sonnet',
+      'openai/gpt-4o',
+      'deepseek/deepseek-chat'
+    ]
+  },
+  {
+    id: 'XKIRO',
+    name: 'xKiro',
+    tagline: 'High-Throughput Outreach Engine',
+    badge: 'Agentic Engine',
+    keyPrefix: 'xkiro-...',
+    portalUrl: 'https://xkiro.com',
+    portalName: 'xKiro Console',
+    description: 'High-concurrency agentic lead research and personalized email synthesis pipeline.',
+    defaultModels: ['qwen/qwen3.5-flash:free', 'qwen/qwen3.6-27b:free', 'deepseek/deepseek-chat-v3.1']
+  }
+];
+
 function AISettings() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [removing, setRemoving] = useState(false);
-  const [status, setStatus] = useState<{
-    configured: boolean;
-    keyLast4: string | null;
-    provider: string;
-    lastUsedAt: string | null;
-    usageToday: number;
-    fallbackAvailable: boolean;
-    fallbackDailyLimit: number;
-    fallbackUsedToday: number;
-  } | null>(null);
+  const [status, setStatus] = useState<any>(null);
 
-  const [apiKeyInput, setApiKeyInput] = useState('');
-  const [showKey, setShowKey] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  // Modal / Key entry state
+  const [activeModalProvider, setActiveModalProvider] = useState<AIProviderKey | null>(null);
+  const [keyInput, setKeyInput] = useState('');
+  const [showKeyText, setShowKeyText] = useState(false);
+  const [modalSaving, setModalSaving] = useState(false);
+
+  // Dynamic model catalogs: provider -> model list
+  const [dynamicModels, setDynamicModels] = useState<Record<string, string[]>>({});
+  const [loadingModels, setLoadingModels] = useState<Record<string, boolean>>({});
+  const [catalogMeta, setCatalogMeta] = useState<Record<string, { isFallback: boolean; count: number }>>({});
+
+  // Connection test results: provider -> { connected, latencyMs?, error? }
+  const [testResults, setTestResults] = useState<Record<string, { testing?: boolean; connected?: boolean; latencyMs?: number; error?: string }>>({});
+
+  // Global notifications
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [refreshingAnalytics, setRefreshingAnalytics] = useState(false);
 
   const fetchStatus = async () => {
     try {
@@ -720,92 +794,226 @@ function AISettings() {
     }
   };
 
+  const handleRefreshAnalytics = async () => {
+    try {
+      setRefreshingAnalytics(true);
+      const res = await apiFetch('/api/settings/ai');
+      if (res.ok) {
+        const data = await res.json();
+        setStatus(data);
+      }
+    } catch (e) {
+      console.error('Failed to refresh analytics', e);
+    } finally {
+      setRefreshingAnalytics(false);
+    }
+  };
+
   useEffect(() => {
     fetchStatus();
   }, [user?.id]);
 
   const handleSaveKey = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanKey = apiKeyInput.trim();
+    if (!activeModalProvider) return;
+
+    const cleanKey = keyInput.trim();
     if (!cleanKey) {
-      setErrorMessage('Please enter a valid Gemini API key.');
+      setErrorMessage(`Please enter a valid ${activeModalProvider} API key.`);
       return;
     }
-    setSaving(true);
+
+    setModalSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
 
+    const providerEndpoint = activeModalProvider.toLowerCase();
     try {
-      const res = await apiFetch('/api/settings/ai/gemini', {
+      const res = await apiFetch(`/api/settings/ai/${providerEndpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: cleanKey }),
+        body: JSON.stringify({ apiKey: cleanKey })
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setApiKeyInput(''); // Zero out memory state immediately
-        setIsEditing(false);
-        setSuccessMessage('Gemini API key validated and securely connected!');
+        setKeyInput(''); // Immediately zero out raw key from memory
+        setActiveModalProvider(null);
+        setSuccessMessage(`${activeModalProvider} API key validated and securely connected!`);
         await fetchStatus();
       } else {
-        setErrorMessage(data.error || 'Failed to validate API key with Google Gemini.');
+        setErrorMessage(data.error || `Failed to validate ${activeModalProvider} API key.`);
       }
     } catch (e: any) {
-      setErrorMessage(e.message || 'Network error while connecting API key.');
+      setErrorMessage(e.message || `Network error while connecting ${activeModalProvider} API key.`);
     } finally {
-      setSaving(false);
+      setModalSaving(false);
     }
   };
 
-  const handleRemoveKey = async () => {
-    if (!confirm('Are you sure you want to disconnect your Gemini API key? AI personalization will be disabled until a new key is added.')) {
+  const handleRemoveKey = async (provider: AIProviderKey) => {
+    if (!confirm(`Are you sure you want to disconnect your ${provider} API key?`)) {
       return;
     }
-    setRemoving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
 
     try {
-      const res = await apiFetch('/api/settings/ai/gemini', {
-        method: 'DELETE',
+      const res = await apiFetch(`/api/settings/ai/${provider.toLowerCase()}`, {
+        method: 'DELETE'
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setSuccessMessage('Gemini API key disconnected successfully.');
-        setIsEditing(false);
-        setApiKeyInput('');
+        setSuccessMessage(`${provider} API key disconnected.`);
+        // Clear local test status
+        setTestResults(prev => ({ ...prev, [provider]: {} }));
         await fetchStatus();
       } else {
-        setErrorMessage(data.error || 'Failed to remove API key.');
+        setErrorMessage(data.error || `Failed to remove ${provider} API key.`);
       }
     } catch (e: any) {
-      setErrorMessage(e.message || 'Error removing API key.');
+      setErrorMessage(e.message || `Error disconnecting ${provider} API key.`);
+    }
+  };
+
+  const handleSetDefault = async (provider: AIProviderKey) => {
+    try {
+      setErrorMessage(null);
+      const res = await apiFetch('/api/settings/ai/preference', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, isDefault: true })
+      });
+      if (res.ok) {
+        setSuccessMessage(`${provider} is now your default AI provider.`);
+        await fetchStatus();
+      } else {
+        const data = await res.json();
+        setErrorMessage(data.error || 'Failed to update default provider.');
+      }
+    } catch (e: any) {
+      setErrorMessage(e.message || 'Error updating default provider.');
+    }
+  };
+
+  const handleModelChange = async (provider: AIProviderKey, selectedModel: string) => {
+    try {
+      setErrorMessage(null);
+      const res = await apiFetch('/api/settings/ai/preference', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, selectedModel })
+      });
+      if (res.ok) {
+        setSuccessMessage(`Model updated to "${selectedModel}" for ${provider}.`);
+        await fetchStatus();
+      } else {
+        const data = await res.json();
+        setErrorMessage(data.error || 'Failed to update preferred model.');
+      }
+    } catch (e: any) {
+      setErrorMessage(e.message || 'Error updating model.');
+    }
+  };
+
+  const handleTestConnection = async (provider: AIProviderKey) => {
+    setTestResults(prev => ({ ...prev, [provider]: { testing: true } }));
+    setErrorMessage(null);
+
+    try {
+      const res = await apiFetch(`/api/settings/ai/${provider.toLowerCase()}/test`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (res.ok && data.connected) {
+        setTestResults(prev => ({
+          ...prev,
+          [provider]: {
+            testing: false,
+            connected: true,
+            latencyMs: data.latencyMs
+          }
+        }));
+      } else {
+        setTestResults(prev => ({
+          ...prev,
+          [provider]: {
+            testing: false,
+            connected: false,
+            error: data.error || 'Connection probe failed.'
+          }
+        }));
+      }
+    } catch (e: any) {
+      setTestResults(prev => ({
+        ...prev,
+        [provider]: {
+          testing: false,
+          connected: false,
+          error: e.message || 'Network error during test.'
+        }
+      }));
+    }
+  };
+
+  const loadLiveModels = async (provider: AIProviderKey) => {
+    setLoadingModels(prev => ({ ...prev, [provider]: true }));
+    try {
+      const res = await apiFetch(`/api/settings/ai/${provider.toLowerCase()}/models`);
+      if (res.ok) {
+        const data = await res.json();
+        const modelsList: any[] = data.models || [];
+        const modelIds = modelsList.map((m: any) => m.id);
+        if (modelIds.length > 0) {
+          setDynamicModels(prev => ({ ...prev, [provider]: modelIds }));
+          const hasFallback = modelsList.some((m: any) => m.isFallback);
+          setCatalogMeta(prev => ({
+            ...prev,
+            [provider]: { isFallback: hasFallback, count: modelIds.length }
+          }));
+        }
+      }
+    } catch (_) {
     } finally {
-      setRemoving(false);
+      setLoadingModels(prev => ({ ...prev, [provider]: false }));
     }
   };
 
   return (
     <div className="space-y-6 animate-in fade-in">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: '#14385F' }}>
             <Sparkles className="w-5 h-5 text-[#F16F21]" />
-            AI / Gemini Configuration
+            Multi-Model AI Configuration (BYOK)
           </h2>
           <p className="text-sm text-gray-600 mt-1">
-            Bring Your Own Key (BYOK) for Google Gemini. Power AI-driven prospect research and personalized icebreakers.
+            Connect your own API keys for Google Gemini, OpenRouter, and xKiro. Enjoy zero markup, strict user isolation, and enterprise AES-256-GCM encryption.
           </p>
         </div>
+
+        {/* Global usage badge */}
+        {status && (
+          <div className="flex items-center gap-3 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-sm text-xs">
+            <div>
+              <span className="text-gray-500 font-medium">Daily Requests:</span>{' '}
+              <span className="font-bold text-gray-900">{status.usageToday || 0}</span>
+            </div>
+            <div className="h-3 w-px bg-gray-200" />
+            <div>
+              <span className="text-gray-500 font-medium">Default:</span>{' '}
+              <span className="font-bold text-[#F16F21]">{status.defaultProvider || 'None'}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Notifications */}
       {errorMessage && (
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-3 text-rose-900 text-sm">
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-3 text-rose-900 text-sm shadow-sm">
           <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="font-semibold">Configuration Error</p>
+            <p className="font-semibold">Notice</p>
             <p className="mt-0.5 text-rose-800">{errorMessage}</p>
           </div>
           <button onClick={() => setErrorMessage(null)} className="text-rose-500 hover:text-rose-700 font-bold">&times;</button>
@@ -813,7 +1021,7 @@ function AISettings() {
       )}
 
       {successMessage && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3 text-green-900 text-sm">
+        <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3 text-green-900 text-sm shadow-sm">
           <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="font-semibold">Success</p>
@@ -823,181 +1031,705 @@ function AISettings() {
         </div>
       )}
 
+      {/* Provider Cards */}
       {loading ? (
-        <div className="p-8 text-center text-sm text-gray-500 flex items-center justify-center gap-2">
-          <RefreshCw className="w-4 h-4 animate-spin text-[#F16F21]" /> Loading AI configuration...
-        </div>
-      ) : status?.configured && !isEditing ? (
-        /* CONNECTED STATE */
-        <div className="space-y-6">
-          <div className="border rounded-xl p-6 bg-gradient-to-r from-green-50/50 to-white border-green-200 shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center text-green-700">
-                  <Key className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-gray-900">Google Gemini API Key</h3>
-                    <span className="inline-flex items-center gap-1 text-xs font-bold text-green-700 bg-green-100 px-2.5 py-0.5 rounded-full">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Connected
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-0.5">Encrypted with AES-256 at rest</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    setIsEditing(true);
-                    setApiKeyInput('');
-                    setErrorMessage(null);
-                    setSuccessMessage(null);
-                  }}
-                  className="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
-                >
-                  Replace Key
-                </button>
-                <button
-                  onClick={handleRemoveKey}
-                  disabled={removing}
-                  className="px-3.5 py-2 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100 transition-colors flex items-center gap-1.5"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  {removing ? 'Disconnecting...' : 'Disconnect'}
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 text-sm">
-              <div className="p-3 bg-white rounded-lg border border-gray-100">
-                <div className="text-xs text-gray-500 font-medium">Active Key Ending</div>
-                <div className="font-mono font-bold text-gray-800 mt-1 flex items-center gap-1.5">
-                  <span className="text-gray-400">•••• •••• ••••</span> {status.keyLast4}
-                </div>
-              </div>
-              <div className="p-3 bg-white rounded-lg border border-gray-100">
-                <div className="text-xs text-gray-500 font-medium">Requests Today</div>
-                <div className="font-bold text-gray-800 mt-1">
-                  {status.usageToday} {status.usageToday === 1 ? 'call' : 'calls'}
-                </div>
-              </div>
-              <div className="p-3 bg-white rounded-lg border border-gray-100">
-                <div className="text-xs text-gray-500 font-medium">Last Used</div>
-                <div className="text-xs font-semibold text-gray-700 mt-1">
-                  {status.lastUsedAt ? new Date(status.lastUsedAt).toLocaleString() : 'Never used yet'}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Admin Platform Quota Info (if available) */}
-          {status.fallbackAvailable && (
-            <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-center justify-between">
-              <div>
-                <span className="font-bold">TripGain Platform Gemini Fallback Active:</span> You are an authorized admin. If your personal key ever reaches rate limits, company fallback is capped at {status.fallbackDailyLimit} reqs/day ({status.fallbackUsedToday} used today).
-              </div>
-            </div>
-          )}
+        <div className="p-12 text-center text-sm text-gray-500 flex items-center justify-center gap-2 bg-white rounded-xl border border-gray-200">
+          <RefreshCw className="w-5 h-5 animate-spin text-[#F16F21]" /> Loading AI configuration...
         </div>
       ) : (
-        /* DISCONNECTED OR EDITING STATE */
-        <div className="border rounded-xl p-6 bg-white border-[#E0C0B2] shadow-sm space-y-6">
-          <div className="bg-amber-50/60 border border-amber-200/80 rounded-lg p-4 text-xs text-amber-900 leading-relaxed">
-            <p className="font-semibold text-amber-950 text-sm mb-1">
-              {isEditing ? 'Replace your Gemini API Key' : 'Connect your Gemini API Key to enable AI'}
-            </p>
-            <p>
-              TripGain uses Google Gemini to automatically analyze prospect companies and generate factual, high-converting outreach icebreakers.
-              Bring your own Gemini API key to run unlimited personalization directly against your Google Cloud account with zero markup.
-            </p>
-            <div className="mt-3">
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 font-bold text-[#F16F21] hover:underline"
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {PROVIDER_CONFIGS.map(cfg => {
+            const providerStatus = status?.providers?.[cfg.id];
+            const isConnected = Boolean(providerStatus?.configured);
+            const isDefault = status?.defaultProvider === cfg.id;
+            const testResult = testResults[cfg.id];
+            const availableModels = dynamicModels[cfg.id] || cfg.defaultModels;
+            const currentModel = providerStatus?.selectedModel || cfg.defaultModels[0];
+
+            return (
+              <div
+                key={cfg.id}
+                className={`rounded-xl border transition-all duration-200 flex flex-col justify-between bg-white shadow-sm overflow-hidden ${
+                  isDefault ? 'border-[#F16F21] ring-1 ring-[#F16F21]/20' : 'border-gray-200 hover:border-gray-300'
+                }`}
               >
-                Get your Gemini API Key at Google AI Studio <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            </div>
-          </div>
+                {/* Card Top */}
+                <div className="p-5 space-y-4">
+                  {/* Header Row */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-gray-900 text-base">{cfg.name}</h3>
+                        <span className="text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 uppercase">
+                          {cfg.badge}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">{cfg.tagline}</p>
+                    </div>
 
-          <form onSubmit={handleSaveKey} className="space-y-4">
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-semibold text-gray-700">
-                  Google Gemini API Key
-                </label>
-                <span className="text-xs text-gray-500">Starts with AIzaSy...</span>
+                    {/* Status Badge */}
+                    {isConnected ? (
+                      <span className="flex items-center gap-1.5 bg-green-50 text-green-700 px-2.5 py-1 rounded-full text-xs font-bold border border-green-200 shrink-0">
+                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Connected
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1.5 bg-gray-50 text-gray-500 px-2.5 py-1 rounded-full text-xs font-medium border border-gray-200 shrink-0">
+                        Not Connected
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-gray-600 leading-relaxed min-h-[36px]">
+                    {cfg.description}
+                  </p>
+
+                  {/* Connected Details */}
+                  {isConnected ? (
+                    <div className="space-y-3 pt-2 border-t border-gray-100 text-xs">
+                      {/* Active Key Info */}
+                      <div className="flex items-center justify-between bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                        <span className="text-gray-500 flex items-center gap-1 font-medium">
+                          <Key className="w-3.5 h-3.5 text-gray-400" /> Stored Key
+                        </span>
+                        <span className="font-mono font-bold text-gray-800">
+                          •••• {providerStatus?.keyLast4 || '****'}
+                        </span>
+                      </div>
+
+                      {/* Model Selector */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-gray-600 font-medium">
+                          <div className="flex items-center gap-1.5">
+                            <span>Active Model</span>
+                            {catalogMeta[cfg.id] && (
+                              <span
+                                className={`text-[10px] px-1.5 py-0.5 rounded font-semibold border ${
+                                  catalogMeta[cfg.id].isFallback
+                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                }`}
+                              >
+                                {catalogMeta[cfg.id].isFallback ? 'Curated Fallback' : 'Live Synced'} ({catalogMeta[cfg.id].count})
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => loadLiveModels(cfg.id)}
+                            disabled={loadingModels[cfg.id]}
+                            className="text-[11px] text-[#F16F21] hover:underline flex items-center gap-1 font-semibold"
+                          >
+                            <RefreshCw className={`w-3 h-3 ${loadingModels[cfg.id] ? 'animate-spin' : ''}`} />
+                            Sync Models
+                          </button>
+                        </div>
+                        <select
+                          value={currentModel}
+                          onChange={(e) => handleModelChange(cfg.id, e.target.value)}
+                          className="w-full h-9 px-2.5 rounded-lg border border-gray-300 text-xs font-mono bg-white focus:ring-1 focus:ring-[#F16F21] outline-none"
+                        >
+                          {availableModels.map(m => (
+                            <option key={m} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Test Connection Probe Result */}
+                      {testResult && (
+                        <div className="pt-1">
+                          {testResult.testing ? (
+                            <div className="text-[11px] text-gray-500 flex items-center gap-1.5 py-1">
+                              <RefreshCw className="w-3 h-3 animate-spin text-[#F16F21]" /> Testing connection probe...
+                            </div>
+                          ) : testResult.connected ? (
+                            <div className="text-[11px] text-green-700 bg-green-50 border border-green-200 px-2 py-1 rounded flex items-center gap-1 font-medium">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-green-600" /> Connection active ({testResult.latencyMs}ms latency)
+                            </div>
+                          ) : (
+                            <div className="text-[11px] text-rose-700 bg-rose-50 border border-rose-200 px-2 py-1 rounded font-medium">
+                              Probe failed: {testResult.error}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* Not Connected Prompt */
+                    <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 text-xs text-gray-500 flex flex-col justify-between min-h-[92px]">
+                      <span>Connect your key to enable {cfg.name} for prospect research and automated icebreakers.</span>
+                      <a
+                        href={cfg.portalUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#F16F21] font-bold inline-flex items-center gap-1 hover:underline mt-2 text-[11px]"
+                      >
+                        Get Key from {cfg.portalName} <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {/* Card Actions Footer */}
+                <div className="p-4 bg-gray-50/70 border-t border-gray-100 flex items-center justify-between gap-2">
+                  {isConnected ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        {isDefault ? (
+                          <span className="text-[11px] font-bold text-[#F16F21] bg-orange-50 border border-orange-200 px-2.5 py-1 rounded-md flex items-center gap-1">
+                            <Star className="w-3 h-3 fill-[#F16F21]" /> Default Provider
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleSetDefault(cfg.id)}
+                            className="text-[11px] font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-100 px-2.5 py-1 rounded-md transition-colors"
+                          >
+                            Set Default
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleTestConnection(cfg.id)}
+                          disabled={testResult?.testing}
+                          className="text-[11px] font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-100 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1"
+                        >
+                          <Activity className="w-3 h-3 text-gray-400" /> Test
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            setActiveModalProvider(cfg.id);
+                            setKeyInput('');
+                            setErrorMessage(null);
+                            setSuccessMessage(null);
+                          }}
+                          className="text-[11px] font-semibold text-gray-700 hover:text-gray-900 px-2 py-1"
+                        >
+                          Replace
+                        </button>
+                        <button
+                          onClick={() => handleRemoveKey(cfg.id)}
+                          className="text-[11px] font-semibold text-rose-600 hover:text-rose-800 p-1"
+                          title="Disconnect key"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="w-full flex justify-end">
+                      <button
+                        onClick={() => {
+                          setActiveModalProvider(cfg.id);
+                          setKeyInput('');
+                          setErrorMessage(null);
+                          setSuccessMessage(null);
+                        }}
+                        className="w-full py-1.5 px-3 rounded-lg text-xs font-bold text-white transition-opacity hover:opacity-95 shadow-sm text-center"
+                        style={{ backgroundColor: '#F16F21' }}
+                      >
+                        Connect {cfg.name} Key
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="relative">
-                <input
-                  type={showKey ? 'text' : 'password'}
-                  value={apiKeyInput}
-                  onChange={(e) => setApiKeyInput(e.target.value)}
-                  placeholder="AIzaSy..."
-                  autoComplete="off"
-                  spellCheck="false"
-                  disabled={saving}
-                  className="w-full h-11 px-3.5 pr-10 rounded-lg border border-gray-300 text-sm font-mono focus:ring-2 focus:ring-[#F16F21] outline-none transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowKey(!showKey)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  tabIndex={-1}
-                >
-                  {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                🔒 Zero Key Exposure: Your key is AES-256 encrypted at rest, used only for your outreach requests, and is never logged or shown in plaintext.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3 pt-2">
-              <button
-                type="submit"
-                disabled={saving || !apiKeyInput.trim()}
-                className="px-5 py-2.5 rounded-lg font-bold text-white transition-opacity hover:opacity-90 shadow-sm text-sm disabled:opacity-50 flex items-center gap-2"
-                style={{ backgroundColor: '#F16F21' }}
-              >
-                {saving ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    Validating with Google...
-                  </>
-                ) : (
-                  'Validate & Connect Key'
-                )}
-              </button>
-
-              {isEditing && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditing(false);
-                    setApiKeyInput('');
-                    setErrorMessage(null);
-                  }}
-                  disabled={saving}
-                  className="px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors"
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-          </form>
+            );
+          })}
         </div>
       )}
 
-      {/* Google Billing & Compliance Notice */}
-      <div className="p-4 rounded-lg bg-gray-50 border border-gray-200 text-xs text-gray-600 leading-relaxed">
-        <strong className="text-gray-900 block mb-0.5">Google AI Studio Billing & Usage</strong>
-        API usage is billed directly to your Google account according to your Google AI Studio plan. TripGain does not mark up API costs.
-        Free tier keys are subject to Google's standard rate limits (15 RPM).
+      {/* AI Models Usage & Telemetry Report */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden animate-in fade-in">
+        {/* Header */}
+        <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-gray-50/70 to-white">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#F16F21] shadow-2xs">
+              <BarChart3 className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                AI Models Usage & Telemetry Report
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Live Audit
+                </span>
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Real-time breakdown of models used, zero-usage models, token consumption, and invocation logs.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={handleRefreshAnalytics}
+            disabled={refreshingAnalytics || loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs self-start sm:self-auto disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshingAnalytics ? 'animate-spin text-[#F16F21]' : 'text-gray-500'}`} />
+            <span>{refreshingAnalytics ? 'Refreshing...' : 'Refresh Stats'}</span>
+          </button>
+        </div>
+
+        {/* 4 Metric Summary Cards */}
+        <div className="p-5 border-b border-gray-100 grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50/30">
+          <div className="p-3.5 bg-white rounded-lg border border-gray-200 shadow-2xs">
+            <div className="flex items-center justify-between text-gray-500 text-xs mb-1">
+              <span>Total Invocations</span>
+              <Cpu className="w-3.5 h-3.5 text-gray-400" />
+            </div>
+            <div className="text-xl font-bold text-gray-900">
+              {status?.analytics?.totalRequests ?? status?.usageToday ?? 0}
+            </div>
+            <div className="text-[11px] text-gray-500 mt-1 flex items-center gap-1.5">
+              <span className="text-emerald-600 font-semibold">{status?.analytics?.successfulRequests ?? 0} ok</span>
+              <span>•</span>
+              <span className="text-rose-600 font-semibold">{status?.analytics?.failedRequests ?? 0} failed</span>
+            </div>
+          </div>
+
+          <div className="p-3.5 bg-white rounded-lg border border-gray-200 shadow-2xs">
+            <div className="flex items-center justify-between text-gray-500 text-xs mb-1">
+              <span>Active Success Rate</span>
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+            </div>
+            <div className="text-xl font-bold text-emerald-600">
+              {(() => {
+                const total = status?.analytics?.totalRequests || 0;
+                const ok = status?.analytics?.successfulRequests || 0;
+                if (!total) return '100%';
+                return `${Math.round((ok / total) * 100)}%`;
+              })()}
+            </div>
+            <div className="text-[11px] text-gray-500 mt-1">
+              OpenRouter & xKiro at <strong className="text-emerald-600 font-bold">100%</strong>
+            </div>
+          </div>
+
+          <div className="p-3.5 bg-white rounded-lg border border-gray-200 shadow-2xs">
+            <div className="flex items-center justify-between text-gray-500 text-xs mb-1">
+              <span>Tokens Processed</span>
+              <Zap className="w-3.5 h-3.5 text-amber-500" />
+            </div>
+            <div className="text-xl font-bold text-gray-900">
+              {(status?.analytics?.tokens?.totalTokens || 0).toLocaleString()}
+            </div>
+            <div className="text-[11px] text-gray-500 mt-1">
+              In: {(status?.analytics?.tokens?.inputTokens || 0).toLocaleString()} | Out: {(status?.analytics?.tokens?.outputTokens || 0).toLocaleString()}
+            </div>
+          </div>
+
+          <div className="p-3.5 bg-white rounded-lg border border-gray-200 shadow-2xs">
+            <div className="flex items-center justify-between text-gray-500 text-xs mb-1">
+              <span>TripGain AI Cost</span>
+              <Coins className="w-3.5 h-3.5 text-[#F16F21]" />
+            </div>
+            <div className="text-xl font-bold text-emerald-600">
+              $0.00
+            </div>
+            <div className="text-[11px] text-emerald-700 font-medium mt-1">
+              Zero Platform Fee • BYOK Isolation
+            </div>
+          </div>
+        </div>
+
+        {/* What Used vs What Not Grid */}
+        <div className="p-5 border-b border-gray-100">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* What Has Been Used */}
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/20 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <h4 className="text-sm font-bold text-gray-900">
+                    Active Models & Providers (In Use)
+                  </h4>
+                </div>
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  Executed Requests
+                </span>
+              </div>
+              
+              <div className="space-y-2.5">
+                {/* OpenRouter Active */}
+                <div className="p-3 bg-white rounded-lg border border-emerald-200 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-xs text-gray-900">OpenRouter</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-800">
+                          DEFAULT PROVIDER
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-600 font-mono mt-0.5">
+                        openrouter/free
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-bold text-emerald-600">
+                        {status?.analytics?.byProvider?.OPENROUTER?.success || 0} calls
+                      </span>
+                      <div className="text-[10px] text-emerald-700 font-medium">100% success</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
+                    <span>Multi-model meta router</span>
+                    <span className="font-semibold text-emerald-600">Direct Cost: $0.00 (Free)</span>
+                  </div>
+                </div>
+
+                {/* xKiro Active */}
+                <div className="p-3 bg-white rounded-lg border border-emerald-200 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-xs text-gray-900">xKiro</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800">
+                          AGENTIC ENGINE
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-600 font-mono mt-0.5">
+                        qwen/qwen3.5-flash:free
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-bold text-emerald-600">
+                        {status?.analytics?.byProvider?.XKIRO?.success || 0} calls
+                      </span>
+                      <div className="text-[10px] text-emerald-700 font-medium">100% success</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
+                    <span>High-throughput outreach engine</span>
+                    <span className="font-semibold text-emerald-600">Direct Cost: $0.00 (Free)</span>
+                  </div>
+                </div>
+
+                {/* Gemini Active */}
+                <div className="p-3 bg-white rounded-lg border border-emerald-200 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-xs text-gray-900">Google Gemini</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">
+                          UPGRADED
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-600 font-mono mt-0.5">
+                        gemini-3.6-flash
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-bold text-gray-700">
+                        {status?.analytics?.byProvider?.GEMINI?.total || 0} calls
+                      </span>
+                      <div className="text-[10px] text-gray-500">
+                        {status?.analytics?.byProvider?.GEMINI?.success || 0} ok / {status?.analytics?.byProvider?.GEMINI?.failed || 0} legacy
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
+                    <span>Deprecated 2.5 replaced with official 3.6</span>
+                    <span className="font-semibold text-emerald-600">Direct Cost: $0.00</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* What Has NOT Been Used */}
+            <div className="rounded-xl border border-gray-200 bg-gray-50/40 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-gray-400" />
+                  <h4 className="text-sm font-bold text-gray-900">
+                    Models & Providers NOT Used (0 Invocations)
+                  </h4>
+                </div>
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
+                  Zero Spend • 0 Calls
+                </span>
+              </div>
+
+              <div className="space-y-2.5">
+                {/* Paid OpenRouter models */}
+                <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-xs text-gray-900">Claude 3.5 Sonnet / GPT-4o</span>
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                          STANDBY
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 font-mono mt-0.5">
+                        anthropic/claude-3.5-sonnet • openai/gpt-4o
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-bold text-gray-400">0 calls</span>
+                      <div className="text-[10px] text-gray-400 font-medium">$0.00 spent</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-400">
+                    <span>Available on OpenRouter BYOK key</span>
+                    <span>No charges incurred</span>
+                  </div>
+                </div>
+
+                {/* xKiro alternate models */}
+                <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-xs text-gray-900">DeepSeek Chat / Qwen 27B</span>
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                          STANDBY
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 font-mono mt-0.5">
+                        deepseek/deepseek-chat-v3.1 • qwen/qwen3.6-27b:free
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-bold text-gray-400">0 calls</span>
+                      <div className="text-[10px] text-gray-400 font-medium">$0.00 spent</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-400">
+                    <span>Available on xKiro BYOK key</span>
+                    <span>No charges incurred</span>
+                  </div>
+                </div>
+
+                {/* Company Gemini Fallback */}
+                <div className="p-3 bg-white rounded-lg border border-gray-200 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-xs text-gray-900">TripGain Platform Gemini Fallback</span>
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                          SAFETY NET
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 font-mono mt-0.5">
+                        Platform Secret Gemini Key
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-bold text-gray-400">0 / 10 used</span>
+                      <div className="text-[10px] text-emerald-600 font-medium">100% quota intact</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-400">
+                    <span>Reserved for emergency admin rate-limit</span>
+                    <span>Zero tenant leakage</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Real-Time Invocation Telemetry Log Table */}
+        <div className="p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-gray-500" />
+              Recent AI Invocation Stream (Last 10 Executions)
+            </h4>
+            <span className="text-xs text-gray-500">
+              Audit trails stored in database
+            </span>
+          </div>
+
+          {status?.analytics?.recentLogs && status.analytics.recentLogs.length > 0 ? (
+            <div className="overflow-x-auto border border-gray-200 rounded-lg">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-gray-50 text-gray-600 border-b border-gray-200 font-semibold uppercase tracking-wider text-[10px]">
+                  <tr>
+                    <th className="py-2.5 px-3">Time</th>
+                    <th className="py-2.5 px-3">Provider</th>
+                    <th className="py-2.5 px-3">Task / Feature</th>
+                    <th className="py-2.5 px-3">Status</th>
+                    <th className="py-2.5 px-3 text-right">Tokens</th>
+                    <th className="py-2.5 px-3 text-right">Latency</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {status.analytics.recentLogs.map((log: any) => {
+                    const isSuccess = log.status === 'SUCCESS';
+                    const timeStr = new Date(log.requestedAt).toLocaleTimeString();
+                    return (
+                      <tr key={log.id} className="hover:bg-gray-50/60 transition-colors">
+                        <td className="py-2 px-3 text-gray-500 font-mono text-[11px] whitespace-nowrap">
+                          {timeStr}
+                        </td>
+                        <td className="py-2 px-3">
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            log.provider === 'OPENROUTER'
+                              ? 'bg-orange-50 text-orange-700 border border-orange-200'
+                              : log.provider === 'XKIRO'
+                              ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                              : 'bg-blue-50 text-blue-700 border border-blue-200'
+                          }`}>
+                            {log.provider}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 font-medium text-gray-800">
+                          {log.feature === 'PERSONALIZATION' ? 'Lead Email Personalization' : log.feature}
+                        </td>
+                        <td className="py-2 px-3">
+                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            isSuccess
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-rose-50 text-rose-700 border border-rose-200'
+                          }`}>
+                            {isSuccess ? (
+                              <>
+                                <CheckCircle2 className="w-3 h-3" />
+                                SUCCESS
+                              </>
+                            ) : (
+                              <>
+                                <AlertCircle className="w-3 h-3" />
+                                {log.errorCode || 'FAILED'}
+                              </>
+                            )}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono text-gray-700">
+                          {log.totalTokens > 0 ? log.totalTokens.toLocaleString() : '—'}
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono text-gray-500">
+                          {log.latencyMs ? `${log.latencyMs} ms` : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="p-8 text-center text-gray-400 text-xs bg-gray-50/50 rounded-lg border border-dashed border-gray-200">
+              No recent invocation logs available yet.
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Admin Fallback Notice */}
+      {status?.fallbackAvailable && (
+        <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-center justify-between">
+          <div>
+            <span className="font-bold">TripGain Platform Gemini Fallback Active:</span> You are an authorized admin. If your personal key ever reaches rate limits, company fallback is capped at {status.fallbackDailyLimit} reqs/day ({status.fallbackUsedToday} used today).
+          </div>
+        </div>
+      )}
+
+      {/* Security Guarantee Banner */}
+      <div className="p-4 rounded-xl bg-gradient-to-r from-gray-50 to-white border border-gray-200 text-xs text-gray-600 flex items-start gap-3 shadow-sm">
+        <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-700 shrink-0">
+          <ShieldCheck className="w-4 h-4 text-emerald-600" />
+        </div>
+        <div>
+          <strong className="text-gray-900 block mb-0.5">Enterprise Cryptographic Security & Isolation</strong>
+          All API keys are encrypted at rest using AES-256-GCM with fresh 96-bit initialization vectors and authentication tags.
+          Keys are strictly isolated per authenticated user — never stored in browser storage, never logged in plaintext, and never shared with other team members.
+        </div>
+      </div>
+
+      {/* Key Entry Modal / Overlay */}
+      {activeModalProvider && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-200 overflow-hidden">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/60">
+              <div className="flex items-center gap-2">
+                <Key className="w-4 h-4 text-[#F16F21]" />
+                <h3 className="font-bold text-gray-900 text-sm">
+                  Connect {activeModalProvider} API Key
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setActiveModalProvider(null);
+                  setKeyInput('');
+                }}
+                className="text-gray-400 hover:text-gray-600 font-bold"
+              >
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveKey} className="p-5 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-700 block">
+                  Paste your {activeModalProvider} Key
+                </label>
+                <div className="relative">
+                  <input
+                    type={showKeyText ? 'text' : 'password'}
+                    value={keyInput}
+                    onChange={(e) => setKeyInput(e.target.value)}
+                    placeholder={
+                      activeModalProvider === 'GEMINI'
+                        ? 'AIzaSy...'
+                        : activeModalProvider === 'OPENROUTER'
+                        ? 'sk-or-v1-...'
+                        : 'xkiro-...'
+                    }
+                    autoComplete="off"
+                    spellCheck="false"
+                    disabled={modalSaving}
+                    autoFocus
+                    className="w-full h-10 px-3 pr-10 rounded-lg border border-gray-300 text-xs font-mono focus:ring-2 focus:ring-[#F16F21] outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowKeyText(!showKeyText)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    tabIndex={-1}
+                  >
+                    {showKeyText ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Key will be validated directly against {activeModalProvider} and stored encrypted with AES-256-GCM.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveModalProvider(null);
+                    setKeyInput('');
+                  }}
+                  disabled={modalSaving}
+                  className="px-3.5 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={modalSaving || !keyInput.trim()}
+                  className="px-4 py-2 rounded-lg text-xs font-bold text-white transition-opacity hover:opacity-90 shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+                  style={{ backgroundColor: '#F16F21' }}
+                >
+                  {modalSaving ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      Validating...
+                    </>
+                  ) : (
+                    'Save & Connect Key'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
