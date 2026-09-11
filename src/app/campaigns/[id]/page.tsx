@@ -34,6 +34,8 @@ export default function CampaignDashboardPage() {
   const [selectedContactTimeline, setSelectedContactTimeline] = useState<any>(null);
   const [loadingTimeline, setLoadingTimeline] = useState(false);
   const [showOpenInfo, setShowOpenInfo] = useState(false);
+  const [showDeliveryInfo, setShowDeliveryInfo] = useState(false);
+  const [showClickInfo, setShowClickInfo] = useState(false);
   
   // Sequence Preview State
   const [previewStep, setPreviewStep] = useState<any>(null);
@@ -997,20 +999,29 @@ export default function CampaignDashboardPage() {
             {/* Top 5 Primary KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               
-              {/* Card 1: Delivered */}
+              {/* Card 1: Delivered (Inferred) */}
               <div className="rounded-2xl border border-border bg-card p-5 shadow-sm relative overflow-hidden group hover:border-[#14385f]/40 transition-all">
                 <div className="flex items-center justify-between text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-2">
-                  <span>Delivered</span>
+                  <span className="flex items-center gap-1">
+                    Delivered (Inferred)
+                    <button 
+                      onClick={() => setShowDeliveryInfo(!showDeliveryInfo)}
+                      className="text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                      title="Based on successful SMTP acceptance and absence of a bounce. Recipient mail servers do not provide a universal post-delivery confirmation."
+                    >
+                      <Info className="w-3.5 h-3.5" />
+                    </button>
+                  </span>
                   <Send className="w-4 h-4 text-blue-500" />
                 </div>
                 <div className="text-3xl font-extrabold text-secondary tracking-tight">
-                  {analytics?.summary?.delivered ?? 0}
+                  {analytics?.summary?.deliveryInferred ?? analytics?.summary?.delivered ?? 0}
                 </div>
                 <div className="text-xs text-muted-foreground mt-2 font-medium">
-                  {analytics?.summary?.delivered ?? 0} of {analytics?.summary?.sent ?? 0} sent delivered
+                  {analytics?.summary?.deliveryInferred ?? analytics?.summary?.delivered ?? 0} of {analytics?.summary?.sent ?? 0} SMTP accepted
                 </div>
                 <div className="text-[11px] text-muted-foreground mt-1 pt-2 border-t border-border flex justify-between">
-                  <span>Delivery: <strong className="text-secondary">{analytics?.summary?.deliveryRate !== null ? `${analytics.summary.deliveryRate}%` : '—'}</strong></span>
+                  <span>Inferred: <strong className="text-secondary">{analytics?.summary?.deliveryRate !== null ? `${analytics.summary.deliveryRate}%` : '—'}</strong></span>
                   <span>Bounces: <strong className="text-red-500">{analytics?.summary?.bounced ?? 0}</strong></span>
                 </div>
               </div>
@@ -1023,7 +1034,7 @@ export default function CampaignDashboardPage() {
                     <button 
                       onClick={() => setShowOpenInfo(!showOpenInfo)}
                       className="text-muted-foreground hover:text-primary transition-colors cursor-pointer"
-                      title="Learn about unique vs total opens"
+                      title="Tracked Opens — may include automated security/privacy systems and should not be interpreted as proof of human reading."
                     >
                       <Info className="w-3.5 h-3.5" />
                     </button>
@@ -1038,7 +1049,7 @@ export default function CampaignDashboardPage() {
                   )}
                 </div>
                 <div className="text-xs text-muted-foreground mt-2 font-medium">
-                  <strong className="text-secondary">{analytics?.summary?.uniqueOpeners ?? 0}</strong> unique openers / {analytics?.summary?.delivered ?? 0} delivered
+                  <strong className="text-secondary">{analytics?.summary?.uniqueOpeners ?? 0}</strong> unique openers / {analytics?.summary?.deliveryInferred ?? analytics?.summary?.delivered ?? 0} inferred
                 </div>
                 <div className="text-[11px] text-muted-foreground mt-1 pt-2 border-t border-border flex justify-between">
                   <span>Total Opens: <strong className="text-secondary">{analytics?.summary?.totalOpens ?? 0}</strong></span>
@@ -1049,7 +1060,16 @@ export default function CampaignDashboardPage() {
               {/* Card 3: Unique Click Rate */}
               <div className="rounded-2xl border border-border bg-card p-5 shadow-sm relative overflow-hidden group hover:border-blue-400/50 transition-all">
                 <div className="flex items-center justify-between text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-2">
-                  <span>Unique Click Rate</span>
+                  <span className="flex items-center gap-1">
+                    Unique Click Rate
+                    <button 
+                      onClick={() => setShowClickInfo(!showClickInfo)}
+                      className="text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                      title="Tracked Clicks — may include automated link scanners."
+                    >
+                      <Info className="w-3.5 h-3.5" />
+                    </button>
+                  </span>
                   <MousePointerClick className="w-4 h-4 text-blue-600" />
                 </div>
                 <div className="text-3xl font-extrabold text-secondary tracking-tight">
@@ -1060,7 +1080,7 @@ export default function CampaignDashboardPage() {
                   )}
                 </div>
                 <div className="text-xs text-muted-foreground mt-2 font-medium">
-                  <strong className="text-secondary">{analytics?.summary?.uniqueClickers ?? 0}</strong> unique clickers / {analytics?.summary?.delivered ?? 0} delivered
+                  <strong className="text-secondary">{analytics?.summary?.uniqueClickers ?? 0}</strong> unique clickers / {analytics?.summary?.deliveryInferred ?? analytics?.summary?.delivered ?? 0} inferred
                 </div>
                 <div className="text-[11px] text-muted-foreground mt-1 pt-2 border-t border-border flex justify-between">
                   <span>Total Clicks: <strong className="text-secondary">{analytics?.summary?.totalClicks ?? 0}</strong></span>
@@ -1110,20 +1130,57 @@ export default function CampaignDashboardPage() {
 
             </div>
 
-            {/* Open Tracking Explanation Banner (if toggled or always visible hint) */}
+            {/* Delivery Explanation Banner */}
+            {showDeliveryInfo && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50/80 p-4 text-xs text-blue-950 leading-relaxed flex items-start gap-3 animate-in fade-in duration-200">
+                <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-semibold text-blue-950">Delivered (Inferred) Methodology</p>
+                  <p>
+                    Based on successful SMTP transport acceptance and the absence of a bounce event. Recipient mail transfer agents (MTAs) like Google Workspace and Microsoft 365 do not provide universal post-delivery confirmation, so delivery is technically inferred.
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setShowDeliveryInfo(false)}
+                  className="text-blue-700 hover:text-blue-950 p-1 shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Open Tracking Explanation Banner */}
             {showOpenInfo && (
               <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-xs text-amber-900 leading-relaxed flex items-start gap-3 animate-in fade-in duration-200">
                 <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                 <div className="space-y-1">
-                  <p className="font-semibold text-amber-950">How Open Tracking & Deduplication Works</p>
+                  <p className="font-semibold text-amber-950">Tracked Opens & Privacy Proxy Note</p>
                   <p>
-                    Email opens are tracked using an invisible 1x1 image pixel. Corporate security scanners, image caching proxies, or a recipient re-opening an email can generate multiple raw open events. 
-                    TripGain deduplicates all events at the contact level so your <strong>Unique Open Rate will never exceed 100%</strong>. Both unique openers and raw total events are reported for complete transparency.
+                    Tracked opens are recorded via an invisible 1x1 image pixel. <strong>Tracked Opens may include automated security systems and privacy proxies</strong> (such as Apple Mail Privacy Protection) and should not be interpreted as definitive proof of human reading. TripGain deduplicates all events at the contact level so your Unique Open Rate is strictly calculated against unique inferred delivered contacts.
                   </p>
                 </div>
                 <button 
                   onClick={() => setShowOpenInfo(false)}
                   className="text-amber-700 hover:text-amber-950 p-1 shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Click Tracking Explanation Banner */}
+            {showClickInfo && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-xs text-blue-900 leading-relaxed flex items-start gap-3 animate-in fade-in duration-200">
+                <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-semibold text-blue-950">Tracked Clicks & Link Scanners</p>
+                  <p>
+                    <strong>Tracked Clicks may include automated security link scanners</strong> and defensive email gateway probes. Unique Click Rates are deduplicated per contact and measured against unique inferred delivery.
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setShowClickInfo(false)}
+                  className="text-blue-700 hover:text-blue-950 p-1 shrink-0"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1280,7 +1337,7 @@ export default function CampaignDashboardPage() {
                       <th className="px-6 py-3 font-semibold uppercase tracking-wider text-xs">Step</th>
                       <th className="px-5 py-3 font-semibold uppercase tracking-wider text-xs">Subject / Delay</th>
                       <th className="px-4 py-3 font-semibold uppercase tracking-wider text-xs text-center">Sent</th>
-                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-xs text-center">Delivered</th>
+                      <th className="px-4 py-3 font-semibold uppercase tracking-wider text-xs text-center">Delivered (Inferred)</th>
                       <th className="px-5 py-3 font-semibold uppercase tracking-wider text-xs text-center">Unique Openers</th>
                       <th className="px-4 py-3 font-semibold uppercase tracking-wider text-xs text-center">Open Rate</th>
                       <th className="px-5 py-3 font-semibold uppercase tracking-wider text-xs text-center">Unique Clickers</th>
