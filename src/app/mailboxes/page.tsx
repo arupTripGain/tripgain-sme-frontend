@@ -34,6 +34,22 @@ export default function MailboxesPage() {
   const [mailboxes, setMailboxes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Dynamic countdown to top-of-the-hour limit reset
+  const [minutesToReset, setMinutesToReset] = useState<number>(() => {
+    const mins = 60 - new Date().getMinutes();
+    return mins <= 0 ? 60 : mins;
+  });
+
+  useEffect(() => {
+    const updateMinutes = () => {
+      const mins = 60 - new Date().getMinutes();
+      setMinutesToReset(mins <= 0 ? 60 : mins);
+    };
+    updateMinutes();
+    const timer = setInterval(updateMinutes, 30000);
+    return () => clearInterval(timer);
+  }, []);
   
   // Connection Modals
   const [showConnectModal, setShowConnectModal] = useState(false);
@@ -749,7 +765,7 @@ export default function MailboxesPage() {
                         </div>
                         <div className="flex items-center justify-between text-[11px] pt-1">
                           <span className="text-muted-foreground">{sentThisHour} sent this hr</span>
-                          <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">{remainingThisHour} left</span>
+                          <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">{remainingThisHour} left • resets in {minutesToReset}m</span>
                         </div>
                       </div>
 
@@ -1049,7 +1065,7 @@ export default function MailboxesPage() {
                         <div className="text-secondary font-semibold">
                           {sentThisHour} / {hourlyLimit} <span className="text-muted-foreground text-[10px] font-normal">/ hr</span>
                         </div>
-                        <div className="text-[10px] text-muted-foreground">{remainingThisHour} left this hr • Resets :00</div>
+                        <div className="text-[10px] text-muted-foreground">{remainingThisHour} left this hr • Resets in {minutesToReset}m</div>
                       </td>
 
                       {/* Sent Till Now */}
