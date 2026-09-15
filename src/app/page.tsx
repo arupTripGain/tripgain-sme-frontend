@@ -1,33 +1,59 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 
 import { Users, Send, Reply, CheckCircle, UserPlus, UserMinus } from 'lucide-react';
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
+
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
     setLoading(true);
     apiFetch('/api/dashboard')
-      .then(res => res.json())
-      .then(d => {
-        setData(d);
+      .then(async (res) => {
+        if (!res.ok) {
+          if (res.status === 401) {
+            router.push('/login');
+            return null;
+          }
+          throw new Error(`HTTP ${res.status}`);
+        }
+        return res.json();
+      })
+      .then((d) => {
+        if (d && !d.error) {
+          setData(d);
+        }
         setLoading(false);
       })
-      .catch(err => {
+      .catch((err) => {
         console.error('Failed to load dashboard:', err);
         setLoading(false);
       });
-  }, [user?.id]);
+  }, [user?.id, authLoading]);
 
   const firstName = user?.name ? user.name.split(' ')[0] : 'there';
 
-  if (loading) return <div className="p-8 text-center text-muted-foreground">Loading Dashboard...</div>;
+  if (authLoading || loading) {
+    return <div className="p-8 text-center text-muted-foreground">Loading Dashboard...</div>;
+  }
+
+  const recentActivity: any[] = Array.isArray(data?.recentActivity) ? data.recentActivity : [];
+  const upcomingSends: any[] = Array.isArray(data?.upcomingSends) ? data.upcomingSends : [];
+  const campaigns: any[] = Array.isArray(data?.campaigns) ? data.campaigns : [];
 
   const stats = [
     { label: 'Total Leads', value: data?.stats?.totalLeads || 0, icon: Users },
@@ -63,17 +89,17 @@ export default function Dashboard() {
         <div className="rounded-lg border border-border bg-card shadow-sm p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-heading text-lg font-bold text-secondary">Today's Activity</h2>
-            {data?.recentActivity?.length > 0 && (
+            {recentActivity.length > 0 && (
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                {data.recentActivity.length} event{data.recentActivity.length > 1 ? 's' : ''}
+                {recentActivity.length} event{recentActivity.length > 1 ? 's' : ''}
               </span>
             )}
           </div>
           <div className="space-y-3">
-            {data?.recentActivity?.length === 0 ? (
+            {recentActivity.length === 0 ? (
               <div className="text-sm text-muted-foreground">No recent activity today.</div>
             ) : (
-              data.recentActivity.map((act: any, i: number) => {
+              recentActivity.map((act: any, i: number) => {
                 const getBadgeStyle = (action: string) => {
                   switch (action) {
                     case 'Email Opened':
@@ -113,13 +139,13 @@ export default function Dashboard() {
         <div className="rounded-lg border border-border bg-card shadow-sm p-6">
           <h2 className="font-heading text-lg font-bold text-secondary mb-4">Upcoming Sends</h2>
           <div className="space-y-4">
-            {data?.upcomingSends?.length === 0 ? (
+            {upcomingSends.length === 0 ? (
               <div className="text-sm text-muted-foreground">No upcoming scheduled emails.</div>
             ) : (
-              data.upcomingSends.map((s: any, i: number) => (
+              upcomingSends.map((s: any, i: number) => (
                 <div key={i} className="text-sm border-b border-border pb-2 last:border-0 last:pb-0 flex flex-col">
-                  <span className="font-medium text-secondary">{s.contact.email}</span>
-                  <span className="text-muted-foreground">{s.campaign.name} (Step {s.currentStep})</span>
+                  <span className="font-medium text-secondary">{s.contact?.email || 'Contact'}</span>
+                  <span className="text-muted-foreground">{s.campaign?.name || 'Campaign'} (Step {s.currentStep})</span>
                   <span className="text-xs text-blue-600 mt-1 font-medium">Due at: {new Date(s.nextSendAt).toLocaleString()}</span>
                 </div>
               ))
@@ -143,12 +169,12 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {data?.campaigns?.length === 0 ? (
+              {campaigns.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="pt-4 text-center text-muted-foreground">No active campaigns.</td>
                 </tr>
               ) : (
-                data.campaigns.map((c: any, i: number) => (
+                campaigns.map((c: any, i: number) => (
                   <tr key={i} className="border-b border-border last:border-0">
                     <td className="py-3 font-medium">{c.name}</td>
                     <td className="py-3 text-right">{c.leads}</td>
