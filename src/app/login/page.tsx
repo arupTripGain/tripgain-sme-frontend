@@ -5,43 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import logoImg from '@/app/Tripgain Kinetic.png';
 import { useAuth } from '@/context/AuthContext';
-import { Mail, Lock, Eye, EyeOff, Sparkles, User, ShieldCheck, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
-
-const DEMO_ACCOUNTS = [
-  {
-    name: 'Arup Nirala',
-    email: 'admin@tripgain.com',
-    password: 'password123',
-    role: 'ADMIN',
-    roleLabel: 'Admin',
-    badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
-    avatarBg: 'bg-purple-600 text-white',
-    avatarText: 'AN',
-    desc: 'Full workspace & team access'
-  },
-  {
-    name: 'Sarah Jenkins',
-    email: 'sarah.jenkins@tripgain.com',
-    password: 'password123',
-    role: 'MEMBER',
-    roleLabel: 'SDR Member',
-    badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
-    avatarBg: 'bg-blue-600 text-white',
-    avatarText: 'SJ',
-    desc: 'Lead outreach & inbox management'
-  },
-  {
-    name: 'Vikram Malhotra',
-    email: 'vikram.malhotra@tripgain.com',
-    password: 'password123',
-    role: 'MANAGER',
-    roleLabel: 'Campaign Manager',
-    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    avatarBg: 'bg-emerald-600 text-white',
-    avatarText: 'VM',
-    desc: 'Campaign strategy & team performance'
-  }
-];
+import { Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -52,16 +16,13 @@ export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent, overrideEmail?: string, overridePassword?: string) => {
-    if (e) e.preventDefault();
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError('');
     setLoading(true);
 
-    const targetEmail = overrideEmail || email;
-    const targetPassword = overridePassword || password;
-
     try {
-      const res = await login(targetEmail, targetPassword);
+      const res = await login(email, password);
       if (!res.success) {
         setError(res.error || 'Invalid email or password. Please try again.');
         setLoading(false);
@@ -72,12 +33,6 @@ export default function LoginPage() {
       setError(err.message || 'Invalid email or password. Please try again.');
       setLoading(false);
     }
-  };
-
-  const handleQuickLogin = (demo: typeof DEMO_ACCOUNTS[0]) => {
-    setEmail(demo.email);
-    setPassword(demo.password);
-    handleLogin(null as any, demo.email, demo.password);
   };
 
   return (
@@ -188,52 +143,6 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-
-          {/* Quick Demo Login Switcher */}
-          <div className="mt-8 pt-6 border-t border-gray-100">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                Quick 1-Click Demo Accounts
-              </span>
-              <span className="text-[11px] text-gray-400">Instant test login</span>
-            </div>
-
-            <div className="space-y-2">
-              {DEMO_ACCOUNTS.map((demo) => (
-                <button
-                  key={demo.email}
-                  type="button"
-                  onClick={() => handleQuickLogin(demo)}
-                  disabled={loading}
-                  className="w-full text-left p-2.5 rounded-xl border border-gray-100 hover:border-blue-200 hover:bg-blue-50/40 transition-all flex items-center justify-between group disabled:opacity-50"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${demo.avatarBg}`}>
-                      {demo.avatarText}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">
-                          {demo.name}
-                        </span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium border ${demo.badgeColor}`}>
-                          {demo.roleLabel}
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-gray-400 block truncate max-w-[200px]">
-                        {demo.email}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-xs text-blue-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                    <span>Login</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Footer info */}
