@@ -723,7 +723,7 @@ const PROVIDER_CONFIGS: ProviderCardConfig[] = [
     portalUrl: 'https://aistudio.google.com/app/apikey',
     portalName: 'Google AI Studio',
     description: 'Ultra-fast multimodal lead research and factual personalization powered by Google Gemini.',
-    defaultModels: ['gemini-3.6-flash', 'gemini-flash-lite-latest', 'gemini-pro-latest']
+    defaultModels: ['gemini-flash-lite-latest', 'gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-pro-latest']
   },
   {
     id: 'OPENROUTER',
@@ -1417,7 +1417,7 @@ function AISettings() {
                         </span>
                       </div>
                       <div className="text-xs text-gray-600 font-mono mt-0.5">
-                        gemini-3.6-flash
+                        {status?.providers?.GEMINI?.selectedModel || 'gemini-flash-lite-latest'}
                       </div>
                     </div>
                     <div className="text-right">
