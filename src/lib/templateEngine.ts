@@ -81,12 +81,32 @@ export class TemplateEngine {
     const plainTemplate = TemplateEngine.autoBalanceTags(TemplateEngine.htmlToHandlebars(templateStr));
 
     try {
-      const template = Handlebars.compile(plainTemplate, { noEscape: true });
-      
-      const processedData: Record<string, any> = {};
-      
-      for (const key of Object.keys(VARIABLE_REGISTRY)) {
+      const instance = Handlebars.create();
+
+      // Register helperMissing: this is ONLY called when a variable is actually evaluated in an active/rendered branch!
+      // Variables in unselected IF/ELSE branches are NEVER evaluated by Handlebars, preventing false-positive [MISSING ...] errors.
+      instance.registerHelper('helperMissing', function (...args: any[]) {
+        const options = args[args.length - 1];
+        const key = options?.name || '';
         const config = VARIABLE_REGISTRY[key];
+
+        if (highlightVariables) {
+          // If in preview highlight mode and a missing variable is reached:
+          return new instance.SafeString(
+            `<span class="bg-red-100 text-red-800 px-1 rounded mx-0.5 font-bold" title="Missing variable ${key}">[MISSING ${key}]</span>`
+          );
+        }
+
+        // When not highlighting variables (clean/production render):
+        if (config?.fallback) {
+          return config.fallback;
+        }
+        return '';
+      });
+
+      const processedData: Record<string, any> = {};
+
+      for (const key of Object.keys(VARIABLE_REGISTRY)) {
         let rawVal = data[key];
 
         // Bidirectional fallback between personalization and personalizedLine
@@ -97,20 +117,21 @@ export class TemplateEngine {
         }
 
         const isMissing = rawVal === undefined || rawVal === null || rawVal.toString().trim() === '';
-        
+
         if (!isMissing) {
           if (highlightVariables) {
-            processedData[key] = new Handlebars.SafeString(`<span class="bg-blue-100 text-blue-800 px-1 rounded mx-0.5 whitespace-pre-wrap" title="${key}">${rawVal}</span>`);
+            processedData[key] = new instance.SafeString(
+              `<span class="bg-blue-100 text-blue-800 px-1 rounded mx-0.5 whitespace-pre-wrap" title="${key}">${rawVal}</span>`
+            );
           } else {
             processedData[key] = rawVal;
           }
-        } else {
-          if (highlightVariables && config?.required) {
-            processedData[key] = new Handlebars.SafeString(`<span class="bg-red-100 text-red-800 px-1 rounded mx-0.5 font-bold" title="Missing required variable ${key}">[MISSING ${key}]</span>`);
-          } else {
-            processedData[key] = "";
-          }
         }
+        // NOTE: If isMissing is true, we intentionally omit key from processedData!
+        // This ensures:
+        // 1. Handlebars treats {{#if key}} as falsy -> routes to {{else}}
+        // 2. Unselected branches containing {{key}} are never evaluated
+        // 3. helperMissing is only invoked if {{key}} is actually evaluated outside of an if/else fallback
       }
 
       // Also process any custom keys in data that aren't explicitly in VARIABLE_REGISTRY
@@ -120,24 +141,33 @@ export class TemplateEngine {
           const isMissing = rawVal === undefined || rawVal === null || rawVal.toString().trim() === '';
           if (!isMissing) {
             if (highlightVariables) {
-              processedData[key] = new Handlebars.SafeString(`<span class="bg-blue-100 text-blue-800 px-1 rounded mx-0.5 whitespace-pre-wrap" title="${key}">${rawVal}</span>`);
+              processedData[key] = new instance.SafeString(
+                `<span class="bg-blue-100 text-blue-800 px-1 rounded mx-0.5 whitespace-pre-wrap" title="${key}">${rawVal}</span>`
+              );
             } else {
               processedData[key] = rawVal;
             }
-          } else {
-            processedData[key] = "";
           }
         }
       }
-      
+
+      const template = instance.compile(plainTemplate, { noEscape: true });
       let output = template(processedData);
-      
-      // Clean up double spaces or grammar issues (basic)
+
+      // Clean empty paragraphs like <p></p>, <p><br></p>, <p>&nbsp;</p> left behind by conditionals
+      output = output.replace(/<p>\s*(?:<br\s*\/?>|&nbsp;|\s)*<\/p>/gi, '');
+
+      // Clean up double spaces or punctuation spacing
       output = output.replace(/ {2,}/g, ' ');
       output = output.replace(/ ,/g, ',');
       output = output.replace(/ \./g, '.');
       output = output.replace(/\n{3,}/g, '\n\n');
-  
+
+      // Strip any residual raw {{...}} tags that were unhandled
+      if (!highlightVariables) {
+        output = output.replace(/\{\{[^}]+\}\}/g, '');
+      }
+
       return output.trim();
     } catch (e: any) {
       // If Handlebars parsing fails, return the raw template or error msg
