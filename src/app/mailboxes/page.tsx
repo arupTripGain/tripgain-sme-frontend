@@ -7,7 +7,8 @@ import {
   AlertCircle, RefreshCw, ArrowLeft, ExternalLink,
   Edit2, Sliders, ShieldCheck, X, User, Flame, Clock, 
   Send, Check, LayoutGrid, Table as TableIcon, Search,
-  TrendingUp, BarChart3, AlertTriangle, ChevronRight, Zap
+  TrendingUp, BarChart3, AlertTriangle, ChevronRight, Zap,
+  Eye, EyeOff
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
@@ -57,6 +58,9 @@ export default function MailboxesPage() {
   const [showSmtpForm, setShowSmtpForm] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showImapPassword, setShowImapPassword] = useState(false);
+  const [useSameCredentials, setUseSameCredentials] = useState(true);
   
   // Diagnostics
   const [testingId, setTestingId] = useState<string | null>(null);
@@ -338,17 +342,38 @@ export default function MailboxesPage() {
     e.preventDefault();
     setConnecting(true);
     setConnectError(null);
+
+    const emailTrimmed = formData.email.trim();
+    const cleanSmtpUser = (formData.smtpUsername?.trim() || emailTrimmed);
+    const cleanImapUser = useSameCredentials 
+      ? cleanSmtpUser 
+      : (formData.imapUsername?.trim() || cleanSmtpUser);
+    const cleanImapPass = useSameCredentials 
+      ? formData.smtpPassword 
+      : (formData.imapPassword || formData.smtpPassword);
+
+    const payload = {
+      ...formData,
+      email: emailTrimmed,
+      smtpUsername: cleanSmtpUser,
+      smtpPassword: formData.smtpPassword,
+      imapUsername: cleanImapUser,
+      imapPassword: cleanImapPass
+    };
+
     try {
       const res = await apiFetch('/api/mailboxes/smtp-imap', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (res.ok) {
         setShowSmtpForm(false);
         setShowGoogleAppPassword(false);
         setShowConnectModal(false);
+        setShowPassword(false);
+        setShowImapPassword(false);
         setFormData({
           email: '',
           displayName: '',
@@ -1501,7 +1526,15 @@ export default function MailboxesPage() {
                     type="email"
                     required
                     value={formData.email}
-                    onChange={(e) => setFormData(p => ({ ...p, email: e.target.value, smtpUsername: e.target.value, imapUsername: e.target.value }))}
+                    onChange={(e) => {
+                      const newEmail = e.target.value;
+                      setFormData(p => ({
+                        ...p,
+                        email: newEmail,
+                        smtpUsername: !p.smtpUsername || p.smtpUsername === p.email ? newEmail : p.smtpUsername,
+                        imapUsername: !p.imapUsername || p.imapUsername === p.email ? newEmail : p.imapUsername
+                      }));
+                    }}
                     placeholder="you@company.com"
                     className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-background text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
@@ -1518,68 +1551,263 @@ export default function MailboxesPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-secondary mb-1">
-                    {showGoogleAppPassword ? 'Google 16-character App Password *' : 'SMTP Password *'}
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    value={formData.smtpPassword}
-                    onChange={(e) => setFormData(p => ({ ...p, smtpPassword: e.target.value, imapPassword: e.target.value }))}
-                    placeholder={showGoogleAppPassword ? "xxxx xxxx xxxx xxxx" : "••••••••••••"}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-background text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono"
-                  />
-                </div>
-
-                {showSmtpForm && (
+                {showGoogleAppPassword ? (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-bold text-secondary">
+                        Google 16-character App Password *
+                      </label>
+                      <button 
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        {showPassword ? <><EyeOff className="w-3.5 h-3.5" /> Hide</> : <><Eye className="w-3.5 h-3.5" /> Show</>}
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={formData.smtpPassword}
+                        onChange={(e) => setFormData(p => ({ ...p, smtpPassword: e.target.value, imapPassword: e.target.value }))}
+                        placeholder="xxxx xxxx xxxx xxxx"
+                        className="w-full px-3 py-2 pr-10 text-xs rounded-xl border border-border bg-background text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-secondary cursor-pointer"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
                   <div className="space-y-4 pt-2 border-t border-border">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold text-secondary mb-1">SMTP Host</label>
-                        <input
-                          type="text"
-                          required
-                          value={formData.smtpHost}
-                          onChange={(e) => setFormData(p => ({ ...p, smtpHost: e.target.value }))}
-                          placeholder="smtp.office365.com"
-                          className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-background text-secondary focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-secondary mb-1">SMTP Port</label>
-                        <input
-                          type="number"
-                          required
-                          value={formData.smtpPort}
-                          onChange={(e) => setFormData(p => ({ ...p, smtpPort: Number(e.target.value) }))}
-                          className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-background text-secondary focus:outline-none"
-                        />
+                    {/* Quick Presets */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Provider Presets</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFormData(p => ({
+                            ...p,
+                            provider: 'OUTLOOK',
+                            smtpHost: 'smtp.office365.com',
+                            smtpPort: 587,
+                            imapHost: 'outlook.office365.com',
+                            imapPort: 993
+                          }))}
+                          className={cn(
+                            "px-2.5 py-1.5 text-xs font-semibold rounded-lg border text-center transition-all cursor-pointer",
+                            formData.smtpHost === 'smtp.office365.com' ? "border-primary bg-primary/10 text-primary font-bold shadow-xs" : "border-border bg-card hover:bg-muted text-secondary"
+                          )}
+                        >
+                          Office 365
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData(p => ({
+                            ...p,
+                            provider: 'ZOHO',
+                            smtpHost: 'smtp.zoho.com',
+                            smtpPort: 465,
+                            imapHost: 'imappro.zoho.com',
+                            imapPort: 993
+                          }))}
+                          className={cn(
+                            "px-2.5 py-1.5 text-xs font-semibold rounded-lg border text-center transition-all cursor-pointer",
+                            formData.smtpHost === 'smtp.zoho.com' ? "border-primary bg-primary/10 text-primary font-bold shadow-xs" : "border-border bg-card hover:bg-muted text-secondary"
+                          )}
+                        >
+                          Zoho Mail
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData(p => ({
+                            ...p,
+                            provider: 'SMTP_IMAP',
+                            smtpHost: '',
+                            smtpPort: 587,
+                            imapHost: '',
+                            imapPort: 993
+                          }))}
+                          className={cn(
+                            "px-2.5 py-1.5 text-xs font-semibold rounded-lg border text-center transition-all cursor-pointer",
+                            formData.smtpHost !== 'smtp.office365.com' && formData.smtpHost !== 'smtp.zoho.com' ? "border-primary bg-primary/10 text-primary font-bold shadow-xs" : "border-border bg-card hover:bg-muted text-secondary"
+                          )}
+                        >
+                          Custom Server
+                        </button>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    {/* SMTP Outgoing Mail */}
+                    <div className="p-3.5 rounded-xl bg-muted/40 border border-border space-y-3">
+                      <div className="font-bold text-xs text-secondary flex items-center gap-1.5">
+                        <Send className="w-3.5 h-3.5 text-primary" />
+                        Outgoing Mail (SMTP)
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-secondary mb-1">SMTP Host *</label>
+                          <input
+                            type="text"
+                            required
+                            value={formData.smtpHost}
+                            onChange={(e) => setFormData(p => ({ ...p, smtpHost: e.target.value }))}
+                            placeholder="smtp.office365.com"
+                            className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-background text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-secondary mb-1">SMTP Port *</label>
+                          <input
+                            type="number"
+                            required
+                            value={formData.smtpPort}
+                            onChange={(e) => setFormData(p => ({ ...p, smtpPort: Number(e.target.value) }))}
+                            placeholder="587"
+                            className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-background text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          />
+                        </div>
+                      </div>
+
+                      {/* SMTP USERNAME (REQUIRED) */}
                       <div>
-                        <label className="block text-xs font-bold text-secondary mb-1">IMAP Host</label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-bold text-secondary">SMTP Username *</label>
+                          <span className="text-[11px] text-muted-foreground">Account login or full email</span>
+                        </div>
                         <input
                           type="text"
                           required
-                          value={formData.imapHost}
-                          onChange={(e) => setFormData(p => ({ ...p, imapHost: e.target.value }))}
-                          placeholder="outlook.office365.com"
-                          className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-background text-secondary focus:outline-none"
+                          value={formData.smtpUsername}
+                          onChange={(e) => setFormData(p => ({ ...p, smtpUsername: e.target.value }))}
+                          placeholder={formData.email || "e.g. user@company.com or login_username"}
+                          className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-background text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono"
                         />
                       </div>
+
+                      {/* SMTP PASSWORD (REQUIRED) */}
                       <div>
-                        <label className="block text-xs font-bold text-secondary mb-1">IMAP Port</label>
-                        <input
-                          type="number"
-                          required
-                          value={formData.imapPort}
-                          onChange={(e) => setFormData(p => ({ ...p, imapPort: Number(e.target.value) }))}
-                          className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-background text-secondary focus:outline-none"
-                        />
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-bold text-secondary">SMTP Password *</label>
+                          <button 
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            {showPassword ? <><EyeOff className="w-3.5 h-3.5" /> Hide</> : <><Eye className="w-3.5 h-3.5" /> Show</>}
+                          </button>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type={showPassword ? "text" : "password"}
+                            required
+                            value={formData.smtpPassword}
+                            onChange={(e) => setFormData(p => ({ ...p, smtpPassword: e.target.value }))}
+                            placeholder="••••••••••••"
+                            className="w-full px-3 py-2 pr-10 text-xs rounded-xl border border-border bg-background text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-secondary cursor-pointer"
+                          >
+                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
                       </div>
+                    </div>
+
+                    {/* IMAP Incoming Mail */}
+                    <div className="p-3.5 rounded-xl bg-muted/40 border border-border space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="font-bold text-xs text-secondary flex items-center gap-1.5">
+                          <Mail className="w-3.5 h-3.5 text-blue-600" />
+                          Incoming Mail (IMAP Reply Sync)
+                        </div>
+                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={useSameCredentials}
+                            onChange={(e) => setUseSameCredentials(e.target.checked)}
+                            className="rounded border-border text-primary focus:ring-primary cursor-pointer"
+                          />
+                          <span>Same username & password</span>
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-secondary mb-1">IMAP Host *</label>
+                          <input
+                            type="text"
+                            required
+                            value={formData.imapHost}
+                            onChange={(e) => setFormData(p => ({ ...p, imapHost: e.target.value }))}
+                            placeholder="outlook.office365.com"
+                            className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-background text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-secondary mb-1">IMAP Port *</label>
+                          <input
+                            type="number"
+                            required
+                            value={formData.imapPort}
+                            onChange={(e) => setFormData(p => ({ ...p, imapPort: Number(e.target.value) }))}
+                            placeholder="993"
+                            className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-background text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          />
+                        </div>
+                      </div>
+
+                      {!useSameCredentials && (
+                        <div className="space-y-3 pt-2 border-t border-border">
+                          <div>
+                            <label className="block text-xs font-bold text-secondary mb-1">IMAP Username</label>
+                            <input
+                              type="text"
+                              value={formData.imapUsername}
+                              onChange={(e) => setFormData(p => ({ ...p, imapUsername: e.target.value }))}
+                              placeholder="Defaults to SMTP username"
+                              className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-background text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono"
+                            />
+                          </div>
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-xs font-bold text-secondary">IMAP Password</label>
+                              <button 
+                                type="button"
+                                onClick={() => setShowImapPassword(!showImapPassword)}
+                                className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                              >
+                                {showImapPassword ? <><EyeOff className="w-3.5 h-3.5" /> Hide</> : <><Eye className="w-3.5 h-3.5" /> Show</>}
+                              </button>
+                            </div>
+                            <div className="relative">
+                              <input
+                                type={showImapPassword ? "text" : "password"}
+                                value={formData.imapPassword}
+                                onChange={(e) => setFormData(p => ({ ...p, imapPassword: e.target.value }))}
+                                placeholder="Defaults to SMTP password"
+                                className="w-full px-3 py-2 pr-10 text-xs rounded-xl border border-border bg-background text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowImapPassword(!showImapPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-secondary cursor-pointer"
+                              >
+                                {showImapPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
