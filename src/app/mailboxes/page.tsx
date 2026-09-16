@@ -1588,7 +1588,24 @@ export default function MailboxesPage() {
                     {/* Quick Presets */}
                     <div>
                       <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Provider Presets</label>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-4 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFormData(p => ({
+                            ...p,
+                            provider: 'NETCORE',
+                            smtpHost: 'smtp.netcorecloud.net',
+                            smtpPort: 587,
+                            imapHost: p.imapHost || 'imap.gmail.com',
+                            imapPort: 993
+                          }))}
+                          className={cn(
+                            "px-2 py-1.5 text-xs font-semibold rounded-lg border text-center transition-all cursor-pointer",
+                            formData.smtpHost === 'smtp.netcorecloud.net' ? "border-primary bg-primary/10 text-primary font-bold shadow-xs" : "border-border bg-card hover:bg-muted text-secondary"
+                          )}
+                        >
+                          Netcore
+                        </button>
                         <button
                           type="button"
                           onClick={() => setFormData(p => ({
@@ -1600,7 +1617,7 @@ export default function MailboxesPage() {
                             imapPort: 993
                           }))}
                           className={cn(
-                            "px-2.5 py-1.5 text-xs font-semibold rounded-lg border text-center transition-all cursor-pointer",
+                            "px-2 py-1.5 text-xs font-semibold rounded-lg border text-center transition-all cursor-pointer",
                             formData.smtpHost === 'smtp.office365.com' ? "border-primary bg-primary/10 text-primary font-bold shadow-xs" : "border-border bg-card hover:bg-muted text-secondary"
                           )}
                         >
@@ -1617,7 +1634,7 @@ export default function MailboxesPage() {
                             imapPort: 993
                           }))}
                           className={cn(
-                            "px-2.5 py-1.5 text-xs font-semibold rounded-lg border text-center transition-all cursor-pointer",
+                            "px-2 py-1.5 text-xs font-semibold rounded-lg border text-center transition-all cursor-pointer",
                             formData.smtpHost === 'smtp.zoho.com' ? "border-primary bg-primary/10 text-primary font-bold shadow-xs" : "border-border bg-card hover:bg-muted text-secondary"
                           )}
                         >
@@ -1634,14 +1651,29 @@ export default function MailboxesPage() {
                             imapPort: 993
                           }))}
                           className={cn(
-                            "px-2.5 py-1.5 text-xs font-semibold rounded-lg border text-center transition-all cursor-pointer",
-                            formData.smtpHost !== 'smtp.office365.com' && formData.smtpHost !== 'smtp.zoho.com' ? "border-primary bg-primary/10 text-primary font-bold shadow-xs" : "border-border bg-card hover:bg-muted text-secondary"
+                            "px-2 py-1.5 text-xs font-semibold rounded-lg border text-center transition-all cursor-pointer",
+                            !['smtp.netcorecloud.net', 'smtp.office365.com', 'smtp.zoho.com'].includes(formData.smtpHost) ? "border-primary bg-primary/10 text-primary font-bold shadow-xs" : "border-border bg-card hover:bg-muted text-secondary"
                           )}
                         >
-                          Custom Server
+                          Custom
                         </button>
                       </div>
                     </div>
+
+                    {formData.smtpHost?.includes('netcore') && (
+                      <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200 text-xs text-blue-900 space-y-1">
+                        <div className="font-bold flex items-center gap-1.5 text-blue-700">
+                          <Zap className="w-3.5 h-3.5" />
+                          Netcore Cloud SMTP Details:
+                        </div>
+                        <p className="text-muted-foreground text-[11px]">
+                          <strong>SMTP Username:</strong> Your Netcore account username (found under <em>Netcore Cloud &rarr; Settings &rarr; Integrations &rarr; SMTP</em>).
+                        </p>
+                        <p className="text-muted-foreground text-[11px]">
+                          <strong>SMTP Password:</strong> Your <strong>Netcore API Key</strong> (not your dashboard login password).
+                        </p>
+                      </div>
+                    )}
 
                     {/* SMTP Outgoing Mail */}
                     <div className="p-3.5 rounded-xl bg-muted/40 border border-border space-y-3">
