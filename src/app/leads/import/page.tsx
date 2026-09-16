@@ -44,6 +44,8 @@ export default function ImportCSVPage() {
   
   // Import state
   const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number; percentage: number } | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
   const [report, setReport] = useState<any>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -88,37 +90,98 @@ export default function ImportCSVPage() {
 
   const handleImport = async () => {
     setIsImporting(true);
+    setImportError(null);
     
     // Transform CSV data to mapped JSON
     const payloadContacts = csvData.map(row => {
       const contact: any = {};
       Object.entries(mappings).forEach(([sysKey, csvHeader]) => {
-        if (csvHeader) {
-          contact[sysKey] = row[csvHeader];
+        if (csvHeader && row[csvHeader] !== undefined && row[csvHeader] !== null) {
+          contact[sysKey] = typeof row[csvHeader] === 'string' ? row[csvHeader].trim() : row[csvHeader];
         }
       });
       return contact;
-    });
+    }).filter(c => c.email && typeof c.email === 'string' && c.email.includes('@'));
+
+    if (payloadContacts.length === 0) {
+      setImportError('No valid contacts with an email address found. Please ensure the Work Email column is mapped correctly.');
+      setIsImporting(false);
+      return;
+    }
+
+    // Chunk size to prevent serverless execution timeout & payload size errors
+    const BATCH_SIZE = 100;
+    const chunks: any[][] = [];
+    for (let i = 0; i < payloadContacts.length; i += BATCH_SIZE) {
+      chunks.push(payloadContacts.slice(i, i + BATCH_SIZE));
+    }
+
+    let accumulatedReport = {
+      total: payloadContacts.length,
+      new: 0,
+      updated: 0,
+      duplicates: 0,
+      invalid: 0
+    };
+
+    let activeListId = listMode === 'existing' ? selectedListId : undefined;
+    const initialNewListName = listMode === 'new' ? newListName.trim() : undefined;
 
     try {
-      const res = await apiFetch('/api/contacts/bulk-import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contacts: payloadContacts,
-          listId: listMode === 'existing' ? selectedListId : undefined,
-          newListName: listMode === 'new' ? newListName : undefined
-        })
-      });
-      
-      const stats = await res.json();
-      setReport(stats);
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const processedCount = Math.min((i + 1) * BATCH_SIZE, payloadContacts.length);
+        const percentage = Math.round(((i + 1) / chunks.length) * 100);
+        
+        setImportProgress({
+          current: processedCount,
+          total: payloadContacts.length,
+          percentage
+        });
+
+        const res = await apiFetch('/api/contacts/bulk-import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contacts: chunk,
+            listId: activeListId,
+            newListName: i === 0 ? initialNewListName : undefined
+          })
+        });
+
+        if (!res.ok) {
+          let errorMsg = `Server error (${res.status})`;
+          try {
+            const errJson = await res.json();
+            if (errJson.error) errorMsg = errJson.error;
+            else if (errJson.message) errorMsg = errJson.message;
+          } catch {
+            const errText = await res.text();
+            if (errText) errorMsg = errText.slice(0, 200);
+          }
+          throw new Error(errorMsg);
+        }
+
+        const stats = await res.json();
+        accumulatedReport.new += stats.new || 0;
+        accumulatedReport.updated += stats.updated || 0;
+        accumulatedReport.duplicates += stats.duplicates || 0;
+        accumulatedReport.invalid += stats.invalid || 0;
+
+        // If a new list was created in the initial batch, reuse its listId for subsequent batches
+        if (stats.listId) {
+          activeListId = stats.listId;
+        }
+      }
+
+      setReport(accumulatedReport);
       setStep(5);
-    } catch (err) {
-      console.error(err);
-      alert('Failed to import contacts.');
+    } catch (err: any) {
+      console.error('Import error:', err);
+      setImportError(err.message || 'Failed to import contacts. Please check your data and try again.');
     } finally {
       setIsImporting(false);
+      setImportProgress(null);
     }
   };
 
@@ -301,6 +364,30 @@ export default function ImportCSVPage() {
                       </select>
                     </div>
                   )}
+                  {importError && (
+                    <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30 flex items-start gap-3 text-red-600 text-sm text-left">
+                      <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <div className="font-semibold mb-0.5">Import Failed</div>
+                        <div className="text-xs text-red-500 leading-relaxed">{importError}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {importProgress && (
+                    <div className="space-y-2 pt-2 text-left">
+                      <div className="flex justify-between text-xs text-muted-foreground font-medium">
+                        <span>Importing contacts...</span>
+                        <span>{importProgress.current} / {importProgress.total} ({importProgress.percentage}%)</span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                        <div 
+                          className="bg-primary h-2 rounded-full transition-all duration-300" 
+                          style={{ width: `${importProgress.percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -308,10 +395,10 @@ export default function ImportCSVPage() {
                 <button onClick={() => setStep(3)} className="px-6 py-2 rounded-md border border-border text-sm font-medium hover:bg-muted transition-colors" disabled={isImporting}>Back</button>
                 <button 
                   onClick={handleImport} 
-                  disabled={isImporting || (listMode === 'new' ? !newListName : !selectedListId)}
+                  disabled={isImporting || (listMode === 'new' ? !newListName.trim() : !selectedListId)}
                   className="px-6 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-50"
                 >
-                  {isImporting ? 'Processing...' : <><Play className="w-4 h-4 fill-current" /> Start Import</>}
+                  {isImporting ? (importProgress ? `Importing (${importProgress.percentage}%)...` : 'Processing...') : <><Play className="w-4 h-4 fill-current" /> Start Import</>}
                 </button>
               </div>
             </div>
