@@ -20,7 +20,8 @@ import {
   UserCheck, 
   Shield, 
   PanelLeftClose, 
-  PanelLeftOpen 
+  PanelLeftOpen,
+  Sparkles
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { TeamManagementModal } from '@/components/team/TeamManagementModal';
@@ -32,11 +33,7 @@ export function AppSidebar() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [teamUsers, setTeamUsers] = useState<Array<{ id: string; name: string; email: string; role: string }>>([
-    { id: '1', name: 'Arup Nirala', email: 'admin@tripgain.com', role: 'ADMIN' },
-    { id: '2', name: 'Sarah Jenkins', email: 'sarah.jenkins@tripgain.com', role: 'MEMBER' },
-    { id: '3', name: 'Vikram Malhotra', email: 'vikram.malhotra@tripgain.com', role: 'MANAGER' },
-  ]);
+  const [teamUsers, setTeamUsers] = useState<Array<{ id: string; name: string; email: string; role: string }>>([]);
 
   useEffect(() => {
     const saved = localStorage.getItem('sidebar_collapsed');
@@ -53,7 +50,13 @@ export function AppSidebar() {
     });
   };
 
+  const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
+
   useEffect(() => {
+    if (!isAdmin) {
+      setTeamUsers([]);
+      return;
+    }
     apiFetch('/api/auth/users')
       .then((res) => res.json())
       .then((data) => {
@@ -62,10 +65,11 @@ export function AppSidebar() {
         }
       })
       .catch(() => {});
-  }, [isTeamModalOpen, showUserMenu]);
+  }, [isTeamModalOpen, showUserMenu, isAdmin]);
 
   const navItems = [
     { label: 'Dashboard', icon: LayoutDashboard, href: '/' },
+    ...(isAdmin ? [{ label: 'Lead Intel', icon: Sparkles, href: '/lead-intelligence' }] : []),
     { label: 'Leads', icon: Users, href: '/leads' },
     { label: 'Campaigns', icon: Megaphone, href: '/campaigns' },
     { label: 'Bulk Email', icon: Send, href: '/bulk-email' },
@@ -88,6 +92,7 @@ export function AppSidebar() {
     .toUpperCase() || 'U';
 
   const handleQuickSwitch = async (email: string) => {
+    if (!isAdmin) return;
     setShowUserMenu(false);
     await switchUser(email, 'password123');
   };
@@ -189,36 +194,38 @@ export function AppSidebar() {
               </div>
             </div>
 
-            {/* Quick Switch Accounts */}
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center justify-between">
-                <span>Switch Account</span>
-                <UserCheck className="h-3 w-3" />
+            {/* Quick Switch Accounts - STRICTLY ADMIN ONLY */}
+            {isAdmin && teamUsers.length > 0 && (
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center justify-between">
+                  <span>Switch Account</span>
+                  <UserCheck className="h-3 w-3" />
+                </div>
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {teamUsers
+                    .filter((u) => u.email !== displayEmail)
+                    .map((u) => (
+                      <button
+                        key={u.email}
+                        onClick={() => handleQuickSwitch(u.email)}
+                        className="w-full text-left p-1.5 rounded-lg hover:bg-muted/70 transition-colors flex items-center justify-between group"
+                      >
+                        <div className="truncate pr-2">
+                          <div className="font-medium text-secondary truncate">{u.name}</div>
+                          <div className="text-[10px] text-muted-foreground truncate">{u.email}</div>
+                        </div>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase
+                          ${u.role === 'ADMIN' ? 'bg-purple-50 text-purple-700' : ''}
+                          ${u.role === 'MANAGER' ? 'bg-blue-50 text-blue-700' : ''}
+                          ${u.role === 'MEMBER' ? 'bg-green-50 text-green-700' : ''}
+                        `}>
+                          {u.role}
+                        </span>
+                      </button>
+                    ))}
+                </div>
               </div>
-              <div className="space-y-1 max-h-48 overflow-y-auto">
-                {teamUsers
-                  .filter((u) => u.email !== displayEmail)
-                  .map((u) => (
-                    <button
-                      key={u.email}
-                      onClick={() => handleQuickSwitch(u.email)}
-                      className="w-full text-left p-1.5 rounded-lg hover:bg-muted/70 transition-colors flex items-center justify-between group"
-                    >
-                      <div className="truncate pr-2">
-                        <div className="font-medium text-secondary truncate">{u.name}</div>
-                        <div className="text-[10px] text-muted-foreground truncate">{u.email}</div>
-                      </div>
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase
-                        ${u.role === 'ADMIN' ? 'bg-purple-50 text-purple-700' : ''}
-                        ${u.role === 'MANAGER' ? 'bg-blue-50 text-blue-700' : ''}
-                        ${u.role === 'MEMBER' ? 'bg-green-50 text-green-700' : ''}
-                      `}>
-                        {u.role}
-                      </span>
-                    </button>
-                  ))}
-              </div>
-            </div>
+            )}
 
             {/* Role-based Settings Options */}
             <div className="border-t border-border pt-2 space-y-1">

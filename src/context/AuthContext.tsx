@@ -76,6 +76,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const switchUser = async (email: string, password = 'password123') => {
+    if (user?.role?.toUpperCase() !== 'ADMIN') {
+      return { success: false, error: 'Unauthorized: Only administrators are allowed to switch accounts.' };
+    }
     const result = await login(email, password);
     if (result.success) {
       sessionStorage.clear();
