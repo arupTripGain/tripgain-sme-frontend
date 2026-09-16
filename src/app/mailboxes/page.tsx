@@ -792,6 +792,10 @@ export default function MailboxesPage() {
                           <span className="text-muted-foreground">{sentThisHour} sent this hr</span>
                           <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">{remainingThisHour} left • resets in {minutesToReset}m</span>
                         </div>
+                        <div className="text-[11px] text-muted-foreground/85 flex items-center gap-1.5 pt-1 border-t border-border/60">
+                          <Zap className="w-3 h-3 text-amber-500 shrink-0" />
+                          <span>Paced Drip: <strong>~1 email / {Math.max(1, Math.round(60 / Math.max(1, hourlyLimit)))} min{Math.round(60 / Math.max(1, hourlyLimit)) > 1 ? 's' : ''}</strong></span>
+                        </div>
                       </div>
 
                       {/* Active Sending Window */}
@@ -1091,6 +1095,7 @@ export default function MailboxesPage() {
                           {sentThisHour} / {hourlyLimit} <span className="text-muted-foreground text-[10px] font-normal">/ hr</span>
                         </div>
                         <div className="text-[10px] text-muted-foreground">{remainingThisHour} left this hr • Resets in {minutesToReset}m</div>
+                        <div className="text-[10px] text-blue-600 font-medium">~1 email / {Math.max(1, Math.round(60 / Math.max(1, hourlyLimit)))}m drip</div>
                       </td>
 
                       {/* Sent Till Now */}
@@ -1224,7 +1229,9 @@ export default function MailboxesPage() {
                     onChange={(e) => setEditHourlyLimit(Number(e.target.value))}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-background text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
-                  <p className="text-[11px] text-muted-foreground mt-1">Maximum velocity sent per hour.</p>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Paced drip rate: <strong className="text-primary font-bold">~1 email every {Math.max(1, Math.round(60 / Math.max(1, editHourlyLimit)))} min{Math.round(60 / Math.max(1, editHourlyLimit)) > 1 ? 's' : ''}</strong> (evenly spaced across 60 mins).
+                  </p>
                 </div>
               </div>
 
