@@ -71,6 +71,7 @@ export function AppSidebar() {
     { label: 'Dashboard', icon: LayoutDashboard, href: '/' },
     ...(isAdmin ? [{ label: 'Lead Intel', icon: Sparkles, href: '/lead-intelligence' }] : []),
     { label: 'Leads', icon: Users, href: '/leads' },
+    { label: 'ListGuard', icon: Shield, href: '/listguard' },
     { label: 'Campaigns', icon: Megaphone, href: '/campaigns' },
     { label: 'Bulk Email', icon: Send, href: '/bulk-email' },
     { label: 'Unibox', icon: Inbox, href: '/unibox' },
