@@ -6,6 +6,7 @@ import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 
 import { Users, Send, Reply, CheckCircle, UserPlus, UserMinus } from 'lucide-react';
+import { SendingQueue } from '@/components/dashboard/SendingQueue';
 
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
@@ -70,6 +71,9 @@ export default function Dashboard() {
         <h1 className="font-heading text-3xl font-bold text-secondary">Good morning, {firstName}</h1>
         <p className="text-muted-foreground mt-1">Your outreach overview</p>
       </div>
+
+      {/* Operational Sending Queue Pipeline */}
+      <SendingQueue />
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
         {stats.map((stat) => (
