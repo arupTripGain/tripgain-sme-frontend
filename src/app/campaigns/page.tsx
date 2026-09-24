@@ -28,7 +28,7 @@ export interface CampaignCompletionInfo {
 }
 
 export default function CampaignsPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [scope, setScope] = useState<'my' | 'all'>('my');
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +44,10 @@ export default function CampaignsPage() {
       const res = await apiFetch(`/api/campaigns/${campaignId}/duplicate`, {
         method: 'POST'
       });
+      if (res.status === 401) {
+        router.push('/login');
+        return;
+      }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Failed to duplicate campaign');
@@ -63,6 +67,10 @@ export default function CampaignsPage() {
       const res = await apiFetch(`/api/campaigns/${campaignId}/activate`, {
         method: 'POST'
       });
+      if (res.status === 401) {
+        router.push('/login');
+        return;
+      }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Failed to launch campaign');
@@ -82,6 +90,10 @@ export default function CampaignsPage() {
       const res = await apiFetch(`/api/campaigns/${campaignId}/pause`, {
         method: 'POST'
       });
+      if (res.status === 401) {
+        router.push('/login');
+        return;
+      }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Failed to pause campaign');
@@ -94,26 +106,39 @@ export default function CampaignsPage() {
     }
   };
 
-  const fetchCampaigns = () => {
+  const fetchCampaigns = async () => {
+    if (authLoading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
     setLoading(true);
-    apiFetch(`/api/campaigns?scope=${scope}`)
-      .then(res => {
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        return res.json();
-      })
-      .then(data => {
-        setCampaigns(Array.isArray(data) ? data : []);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setLoading(false);
-      });
+    try {
+      const res = await apiFetch(`/api/campaigns?scope=${scope}`);
+      if (res.status === 401) {
+        router.push('/login');
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      const data = await res.json();
+      setCampaigns(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      console.warn('Failed to load campaigns:', err?.message || err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
     fetchCampaigns();
-  }, [scope, user]);
+  }, [scope, user, authLoading]);
 
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
@@ -123,6 +148,10 @@ export default function CampaignsPage() {
       const res = await apiFetch(`/api/campaigns/${deleteTarget.id}`, {
         method: 'DELETE'
       });
+      if (res.status === 401) {
+        router.push('/login');
+        return;
+      }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Failed to delete campaign');
@@ -130,7 +159,7 @@ export default function CampaignsPage() {
       setDeleteTarget(null);
       fetchCampaigns();
     } catch (err: any) {
-      console.error(err);
+      console.warn('Failed to delete campaign:', err?.message || err);
       setDeleteError(err.message || 'Error deleting campaign');
     } finally {
       setIsDeleting(false);
