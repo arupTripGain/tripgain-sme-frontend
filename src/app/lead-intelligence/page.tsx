@@ -57,12 +57,24 @@ export default function LeadIntelligencePage() {
 
   // Leads State
   const [leads, setLeads] = useState<any[]>([]);
-  const [leadCounts, setLeadCounts] = useState({ total: 0, unique: 0, duplicate: 0, possibleDuplicate: 0 });
+  const [leadCounts, setLeadCounts] = useState({ 
+    total: 0, 
+    unique: 0, 
+    duplicate: 0, 
+    possibleDuplicate: 0,
+    resolvedHigh: 0,
+    resolvedMedium: 0,
+    resolvedLow: 0,
+    reviewRequired: 0,
+    unresolved: 0,
+    totalResolved: 0
+  });
   const [leadsPage, setLeadsPage] = useState(1);
   const [leadsTotalPages, setLeadsTotalPages] = useState(1);
   const [leadsLimit] = useState(25);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [resolutionFilter, setResolutionFilter] = useState('ALL');
   const [sourceTypeFilter, setSourceTypeFilter] = useState('ALL');
   const [hasEmailFilter, setHasEmailFilter] = useState(false);
   const [hasPhoneFilter, setHasPhoneFilter] = useState(false);
@@ -79,12 +91,13 @@ export default function LeadIntelligencePage() {
     setIsLoadingBatches(true);
     try {
       const res = await apiFetch(`/api/lead-intelligence/batches?page=${batchesPage}&limit=20`);
+      if (res.status === 401) return;
       if (!res.ok) throw new Error('Failed to fetch research batches');
       const data = await res.json();
       setBatches(data.batches || []);
       setBatchesTotalPages(data.pagination?.totalPages || 1);
-    } catch (err) {
-      console.error('Error loading batches:', err);
+    } catch (err: any) {
+      console.warn('Error loading batches:', err?.message || err);
     } finally {
       setIsLoadingBatches(false);
     }
@@ -102,48 +115,64 @@ export default function LeadIntelligencePage() {
       if (selectedBatchId) params.append('batchId', selectedBatchId);
       if (searchQuery.trim()) params.append('search', searchQuery.trim());
       if (statusFilter !== 'ALL') params.append('dedupeStatus', statusFilter);
+      if (resolutionFilter !== 'ALL') params.append('resolutionStatus', resolutionFilter);
       if (sourceTypeFilter !== 'ALL') params.append('sourceType', sourceTypeFilter);
       if (hasEmailFilter) params.append('hasEmail', 'true');
       if (hasPhoneFilter) params.append('hasPhone', 'true');
 
       const res = await apiFetch(`/api/lead-intelligence/leads?${params.toString()}`);
+      if (res.status === 401) return;
       if (!res.ok) throw new Error('Failed to fetch leads');
       const data = await res.json();
       setLeads(data.leads || []);
-      setLeadCounts(data.counts || { total: 0, unique: 0, duplicate: 0, possibleDuplicate: 0 });
+      setLeadCounts(data.counts || { 
+        total: 0, 
+        unique: 0, 
+        duplicate: 0, 
+        possibleDuplicate: 0,
+        resolvedHigh: 0,
+        resolvedMedium: 0,
+        resolvedLow: 0,
+        reviewRequired: 0,
+        unresolved: 0,
+        totalResolved: 0
+      });
       setLeadsTotalPages(data.pagination?.totalPages || 1);
-    } catch (err) {
-      console.error('Error loading leads:', err);
+    } catch (err: any) {
+      console.warn('Error loading leads:', err?.message || err);
     } finally {
       setIsLoadingLeads(false);
     }
-  }, [leadsPage, leadsLimit, selectedBatchId, searchQuery, statusFilter, sourceTypeFilter, hasEmailFilter, hasPhoneFilter]);
+  }, [leadsPage, leadsLimit, selectedBatchId, searchQuery, statusFilter, resolutionFilter, sourceTypeFilter, hasEmailFilter, hasPhoneFilter]);
 
   // Fetch Sources
   const fetchSources = useCallback(async () => {
     setIsLoadingSources(true);
     try {
       const res = await apiFetch(`/api/lead-intelligence/sources?page=${sourcesPage}&limit=20`);
+      if (res.status === 401) return;
       if (!res.ok) throw new Error('Failed to fetch sources');
       const data = await res.json();
       setSources(data.sources || []);
       setSourcesTotalPages(data.pagination?.totalPages || 1);
-    } catch (err) {
-      console.error('Error loading sources:', err);
+    } catch (err: any) {
+      console.warn('Error loading sources:', err?.message || err);
     } finally {
       setIsLoadingSources(false);
     }
   }, [sourcesPage]);
 
-  // Auto poll active batches
+  // Auto poll active batches (6s interval)
   useEffect(() => {
     fetchBatches();
     const interval = setInterval(() => {
-      const hasActive = batches.some(b => b.status === 'DISCOVERING' || b.status === 'EXTRACTING' || b.status === 'QUEUED');
+      const hasActive = batches.some(b => 
+        ['DISCOVERING', 'EXTRACTING', 'QUEUED', 'NORMALIZING', 'DEDUPLICATING', 'RESOLVING_DOMAINS'].includes(b.status)
+      );
       if (hasActive) {
         fetchBatches();
       }
-    }, 3000);
+    }, 6000);
     return () => clearInterval(interval);
   }, [fetchBatches, batches]);
 
@@ -288,12 +317,77 @@ export default function LeadIntelligencePage() {
     }
   };
 
+  const getResolutionBadge = (status: string) => {
+    switch (status) {
+      case 'RESOLVED_HIGH':
+        return (
+          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <CheckCircle2 className="w-3 h-3" /> Resolved (High)
+          </span>
+        );
+      case 'RESOLVED_MEDIUM':
+        return (
+          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+            <CheckCircle2 className="w-3 h-3" /> Resolved (Med)
+          </span>
+        );
+      case 'RESOLVED_LOW':
+        return (
+          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-700 border border-yellow-200">
+            <Clock className="w-3 h-3" /> Resolved (Low)
+          </span>
+        );
+      case 'REVIEW_REQUIRED':
+        return (
+          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+            <AlertTriangle className="w-3 h-3" /> Review Req
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+            Unresolved
+          </span>
+        );
+    }
+  };
+
   const getBatchStatusBadge = (status: string) => {
     switch (status) {
       case 'COMPLETED':
         return (
           <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
             <CheckCircle2 className="w-3 h-3" /> Completed
+          </span>
+        );
+      case 'REVIEW_REQUIRED':
+        return (
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+            <AlertTriangle className="w-3 h-3" /> Review Required
+          </span>
+        );
+      case 'RESOLVING_DOMAINS':
+        return (
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 animate-pulse">
+            <Loader2 className="w-3 h-3 animate-spin" /> Resolving Domains...
+          </span>
+        );
+      case 'NORMALIZING':
+        return (
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200 animate-pulse">
+            <Loader2 className="w-3 h-3 animate-spin" /> Normalizing...
+          </span>
+        );
+      case 'DEDUPLICATING':
+        return (
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 animate-pulse">
+            <Loader2 className="w-3 h-3 animate-spin" /> Deduplicating...
+          </span>
+        );
+      case 'QUEUED':
+        return (
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+            <Clock className="w-3 h-3" /> Queued
           </span>
         );
       case 'PARTIAL':
@@ -407,24 +501,24 @@ export default function LeadIntelligencePage() {
       {/* Metric Cards Bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="p-4 rounded-xl bg-card border border-border shadow-xs">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Ingested</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Exhibitors</span>
           <div className="text-2xl font-bold text-foreground mt-1">{leadCounts.total}</div>
           <span className="text-[11px] text-muted-foreground mt-0.5 block">Across all active batches</span>
         </div>
         <div className="p-4 rounded-xl bg-card border border-border shadow-xs">
-          <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Unique Records</span>
-          <div className="text-2xl font-bold text-emerald-700 mt-1">{leadCounts.unique}</div>
-          <span className="text-[11px] text-muted-foreground mt-0.5 block">Zero collision detected</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Domains Resolved</span>
+          <div className="text-2xl font-bold text-emerald-700 mt-1">{leadCounts.totalResolved}</div>
+          <span className="text-[11px] text-muted-foreground mt-0.5 block">{leadCounts.resolvedHigh} High · {leadCounts.resolvedMedium} Med</span>
         </div>
         <div className="p-4 rounded-xl bg-card border border-border shadow-xs">
-          <span className="text-xs font-semibold uppercase tracking-wider text-rose-700">Confirmed Duplicates</span>
-          <div className="text-2xl font-bold text-rose-700 mt-1">{leadCounts.duplicate}</div>
-          <span className="text-[11px] text-muted-foreground mt-0.5 block">Domain / Email / Exact matches</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-amber-700">Review Required</span>
+          <div className="text-2xl font-bold text-amber-700 mt-1">{leadCounts.reviewRequired}</div>
+          <span className="text-[11px] text-muted-foreground mt-0.5 block">Candidates need human review</span>
         </div>
         <div className="p-4 rounded-xl bg-card border border-border shadow-xs">
-          <span className="text-xs font-semibold uppercase tracking-wider text-amber-700">Possible Duplicates</span>
-          <div className="text-2xl font-bold text-amber-700 mt-1">{leadCounts.possibleDuplicate}</div>
-          <span className="text-[11px] text-muted-foreground mt-0.5 block">Phone or fuzzy name match</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Unresolved</span>
+          <div className="text-2xl font-bold text-muted-foreground mt-1">{leadCounts.unresolved}</div>
+          <span className="text-[11px] text-muted-foreground mt-0.5 block">Zero domain discovered</span>
         </div>
       </div>
 
@@ -552,33 +646,33 @@ export default function LeadIntelligencePage() {
                       {/* Statistics Chips */}
                       <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/60 text-xs">
                         <div className="bg-muted/30 p-2 rounded-lg">
-                          <span className="text-muted-foreground block text-[10px] uppercase font-semibold">Pages</span>
-                          <span className="font-bold text-foreground">
-                            {batch.pagesProcessed} / {batch.totalPages}
+                          <span className="text-muted-foreground block text-[10px] uppercase font-semibold">Stage</span>
+                          <span className="font-bold text-foreground truncate block text-[11px]">
+                            {batch.stage || batch.status}
                           </span>
                         </div>
                         <div className="bg-muted/30 p-2 rounded-lg">
-                          <span className="text-muted-foreground block text-[10px] uppercase font-semibold">Records</span>
+                          <span className="text-muted-foreground block text-[10px] uppercase font-semibold">Exhibitors</span>
                           <span className="font-bold text-foreground">
                             {batch.recordsDiscovered || batch._count?.leads || 0}
                           </span>
                         </div>
                         <div className="bg-muted/30 p-2 rounded-lg">
-                          <span className="text-muted-foreground block text-[10px] uppercase font-semibold">Unique</span>
+                          <span className="text-muted-foreground block text-[10px] uppercase font-semibold">Resolved</span>
                           <span className="font-bold text-emerald-700">
-                            {batch.uniqueRecords || 0}
+                            {batch.domainsResolved ?? 0}
                           </span>
                         </div>
                         <div className="bg-muted/30 p-2 rounded-lg">
-                          <span className="text-muted-foreground block text-[10px] uppercase font-semibold">Duplicates</span>
-                          <span className="font-bold text-rose-700">
-                            {batch.duplicateRecords || 0}
+                          <span className="text-muted-foreground block text-[10px] uppercase font-semibold">Review Req</span>
+                          <span className="font-bold text-amber-700">
+                            {batch.reviewRequired ?? 0}
                           </span>
                         </div>
                         <div className="bg-muted/30 p-2 rounded-lg">
-                          <span className="text-muted-foreground block text-[10px] uppercase font-semibold">Failed</span>
+                          <span className="text-muted-foreground block text-[10px] uppercase font-semibold">Unresolved</span>
                           <span className="font-bold text-muted-foreground">
-                            {batch.failedRecords || 0}
+                            {batch.domainsUnresolved ?? 0}
                           </span>
                         </div>
                         <div className="bg-muted/30 p-2 rounded-lg">
@@ -687,6 +781,19 @@ export default function LeadIntelligencePage() {
 
             <div className="flex flex-wrap items-center gap-2">
               <select
+                value={resolutionFilter}
+                onChange={(e) => { setResolutionFilter(e.target.value); setLeadsPage(1); }}
+                className="px-2.5 py-1.5 text-xs rounded-lg border border-input bg-background text-foreground font-medium"
+              >
+                <option value="ALL">All Resolutions</option>
+                <option value="RESOLVED_HIGH">Resolved (High)</option>
+                <option value="RESOLVED_MEDIUM">Resolved (Medium)</option>
+                <option value="RESOLVED_LOW">Resolved (Low)</option>
+                <option value="REVIEW_REQUIRED">Review Required</option>
+                <option value="UNRESOLVED">Unresolved</option>
+              </select>
+
+              <select
                 value={statusFilter}
                 onChange={(e) => { setStatusFilter(e.target.value); setLeadsPage(1); }}
                 className="px-2.5 py-1.5 text-xs rounded-lg border border-input bg-background text-foreground"
@@ -703,30 +810,12 @@ export default function LeadIntelligencePage() {
                 className="px-2.5 py-1.5 text-xs rounded-lg border border-input bg-background text-foreground"
               >
                 <option value="ALL">All Source Types</option>
+                <option value="WEBSITE">Website / Directory</option>
                 <option value="CSV">CSV</option>
                 <option value="XLSX">Excel (XLSX)</option>
                 <option value="PDF">PDF</option>
                 <option value="PASTED_TEXT">Pasted Text</option>
-                <option value="WEBSITE">Website</option>
               </select>
-
-              <button
-                onClick={() => { setHasEmailFilter(!hasEmailFilter); setLeadsPage(1); }}
-                className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
-                  hasEmailFilter ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-card border-border text-muted-foreground'
-                }`}
-              >
-                Has Email
-              </button>
-
-              <button
-                onClick={() => { setHasPhoneFilter(!hasPhoneFilter); setLeadsPage(1); }}
-                className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
-                  hasPhoneFilter ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-card border-border text-muted-foreground'
-                }`}
-              >
-                Has Phone
-              </button>
             </div>
           </div>
 
@@ -736,13 +825,13 @@ export default function LeadIntelligencePage() {
               <thead>
                 <tr className="border-b border-border bg-muted/30 text-muted-foreground">
                   <th className="py-3 px-3 font-semibold text-center w-12 text-muted-foreground">#</th>
-                  <th className="py-3 px-4 font-semibold">Company Name</th>
-                  <th className="py-3 px-4 font-semibold">Contact Person</th>
-                  <th className="py-3 px-4 font-semibold">Work Email</th>
-                  <th className="py-3 px-4 font-semibold">Phone</th>
-                  <th className="py-3 px-4 font-semibold">City / State</th>
-                  <th className="py-3 px-4 font-semibold">Source</th>
-                  <th className="py-3 px-4 font-semibold">Status</th>
+                  <th className="py-3 px-4 font-semibold">Exhibitor / Company</th>
+                  <th className="py-3 px-4 font-semibold">Website / Domain</th>
+                  <th className="py-3 px-3 font-semibold">Booth / Hall</th>
+                  <th className="py-3 px-4 font-semibold">Category</th>
+                  <th className="py-3 px-4 font-semibold">Resolution Status</th>
+                  <th className="py-3 px-4 font-semibold">Source / Conf</th>
+                  <th className="py-3 px-3 font-semibold">Dedupe</th>
                   <th className="py-3 px-4 font-semibold text-right">Action</th>
                 </tr>
               </thead>
@@ -772,39 +861,60 @@ export default function LeadIntelligencePage() {
                       </td>
                       <td className="py-3 px-4">
                         <div className="font-semibold text-foreground">{lead.companyName}</div>
-                        <div className="text-[11px] text-muted-foreground">{lead.domain || lead.websiteUrl || '—'}</div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="text-foreground">{lead.contactName || '—'}</div>
-                        <div className="text-[11px] text-muted-foreground">{lead.contactTitle || ''}</div>
-                      </td>
-                      <td className="py-3 px-4">
-                        {lead.email ? (
-                          <div className="space-y-0.5">
-                            <span className="font-mono text-foreground">{lead.email}</span>
-                            {lead.hasValidEmail && (
-                              <span className="block text-[10px] text-blue-700 font-semibold">Valid Email Format</span>
-                            )}
+                        {lead.rawName && lead.rawName !== lead.companyName ? (
+                          <div className="text-[10px] text-muted-foreground truncate max-w-[200px]" title={lead.rawName}>
+                            Raw: {lead.rawName}
                           </div>
+                        ) : null}
+                      </td>
+                      <td className="py-3 px-4">
+                        {lead.websiteUrl || lead.domain ? (
+                          <a
+                            href={lead.websiteUrl || `https://${lead.domain}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-primary hover:underline flex items-center gap-1 font-mono text-[11px]"
+                          >
+                            <Globe className="w-3 h-3 shrink-0" />
+                            <span className="truncate max-w-[160px]">{lead.domain || lead.websiteUrl}</span>
+                            <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                          </a>
                         ) : (
-                          <span className="text-muted-foreground italic">missing</span>
+                          <span className="text-muted-foreground italic text-[11px]">Unresolved</span>
                         )}
                       </td>
-                      <td className="py-3 px-4 font-mono text-muted-foreground">
-                        {lead.phone || '—'}
-                      </td>
-                      <td className="py-3 px-4 text-muted-foreground">
-                        {[lead.city, lead.state].filter(Boolean).join(', ') || '—'}
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-1.5">
-                          {getSourceIcon(lead.sourceType)}
-                          <span className="text-[11px] font-medium text-foreground truncate max-w-[120px]">
-                            {lead.sourceName}
+                      <td className="py-3 px-3 font-mono text-foreground">
+                        {lead.boothNumber || lead.hallNumber ? (
+                          <span>
+                            {lead.boothNumber ? `B: ${lead.boothNumber}` : ''}
+                            {lead.boothNumber && lead.hallNumber ? ' · ' : ''}
+                            {lead.hallNumber ? `H: ${lead.hallNumber}` : ''}
                           </span>
-                        </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground truncate max-w-[130px]">
+                        {lead.category || '—'}
                       </td>
                       <td className="py-3 px-4">
+                        {getResolutionBadge(lead.resolutionStatus)}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="text-[11px] font-medium text-foreground">
+                          {lead.resolutionSource || '—'}
+                        </div>
+                        {lead.resolutionEvidence && (
+                          <div 
+                            className="text-[10px] text-muted-foreground truncate max-w-[150px]"
+                            title={typeof lead.resolutionEvidence === 'object' ? (lead.resolutionEvidence.evidence || JSON.stringify(lead.resolutionEvidence)) : String(lead.resolutionEvidence)}
+                          >
+                            {typeof lead.resolutionEvidence === 'object' ? (lead.resolutionEvidence.evidence || '') : String(lead.resolutionEvidence)}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-3">
                         {getStatusBadge(lead.dedupeStatus)}
                       </td>
                       <td className="py-3 px-4 text-right">
@@ -812,7 +922,7 @@ export default function LeadIntelligencePage() {
                           onClick={(e) => { e.stopPropagation(); setSelectedLeadId(lead.id); }}
                           className="px-2.5 py-1 text-[11px] font-semibold rounded-md border border-border bg-card hover:bg-muted text-foreground"
                         >
-                          View
+                          Review
                         </button>
                       </td>
                     </tr>

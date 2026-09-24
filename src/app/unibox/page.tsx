@@ -431,11 +431,17 @@ export default function UniboxPage() {
     { id: 'needs-action', label: 'Needs Action', icon: AlertCircle },
   ];
 
-  const filteredConversations = conversations.filter(c => 
-    c.contact?.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    c.organization?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.campaign?.name?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredConversations = conversations.filter(c => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    const contactName = (c.contact?.fullName || '').toLowerCase();
+    const emails = (c.contact?.emails || []).map((e: any) => e.email?.toLowerCase()).join(' ');
+    const org = (c.organization?.name || '').toLowerCase();
+    const camp = (c.campaign?.name || '').toLowerCase();
+    const subj = (c.subject || '').toLowerCase();
+    const preview = (c.latestMessagePreview || '').toLowerCase();
+    return contactName.includes(q) || emails.includes(q) || org.includes(q) || camp.includes(q) || subj.includes(q) || preview.includes(q);
+  });
 
   return (
     <div className="flex h-full w-full bg-slate-50 overflow-hidden font-sans select-text">

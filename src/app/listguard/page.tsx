@@ -99,6 +99,7 @@ export default function ListGuardPage() {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [activeJob, setActiveJob] = useState<any | null>(null);
   const [isStartingJob, setIsStartingJob] = useState(false);
+  const [jobStartError, setJobStartError] = useState<string | null>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Selected job results state
@@ -148,6 +149,31 @@ export default function ListGuardPage() {
   const [isUpdatingList, setIsUpdatingList] = useState(false);
   const [updateListSuccessMsg, setUpdateListSuccessMsg] = useState<string | null>(null);
   const [updateListErrorMsg, setUpdateListErrorMsg] = useState<string | null>(null);
+
+  // Worker Health State
+  const [workerHealth, setWorkerHealth] = useState<{
+    available: boolean;
+    status: string;
+    activeWorkerCount: number;
+  } | null>(null);
+
+  const fetchWorkerStatus = async () => {
+    try {
+      const res = await apiFetch('/api/listguard/worker-status');
+      if (res.ok) {
+        const data = await res.json();
+        setWorkerHealth(data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch worker status:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchWorkerStatus();
+    const interval = setInterval(fetchWorkerStatus, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Initial fetch
   useEffect(() => {
@@ -254,6 +280,7 @@ export default function ListGuardPage() {
 
   const handleStartVerification = async (list: ListCardItem, forceReverify: boolean = false) => {
     setIsStartingJob(true);
+    setJobStartError(null);
     try {
       const res = await apiFetch('/api/listguard/jobs', {
         method: 'POST',
@@ -263,23 +290,35 @@ export default function ListGuardPage() {
 
       if (res.ok) {
         const jobData = await res.json();
-        setActiveJobId(jobData.jobId);
-        setActiveJob({
-          id: jobData.jobId,
-          listId: list.id,
-          listName: list.name,
-          status: jobData.status,
-          total: jobData.total,
-          processed: 0,
-          deliverable: 0,
-          undeliverable: 0,
-          catchAll: 0,
-          unknown: 0,
-          reusedFromCache: 0
-        });
+        if (jobData && jobData.jobId) {
+          setActiveJobId(jobData.jobId);
+          setActiveJob({
+            id: jobData.jobId,
+            listId: list.id,
+            listName: list.name,
+            status: jobData.status,
+            total: jobData.total,
+            processed: 0,
+            deliverable: 0,
+            undeliverable: 0,
+            catchAll: 0,
+            unknown: 0,
+            reusedFromCache: 0
+          });
+        }
+      } else {
+        const errorData = await res.json().catch(() => ({ error: 'Failed to start verification' }));
+        const errMsg = errorData.error || `Server responded with status ${res.status}`;
+        console.error('Failed to start verification:', errMsg);
+        setJobStartError(`Could not start verification for "${list.name}": ${errMsg}`);
+        setActiveJob(null);
+        setActiveJobId(null);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to start verification:', err);
+      setJobStartError(`Network error starting verification for "${list.name}": ${err?.message || 'Check your connection'}`);
+      setActiveJob(null);
+      setActiveJobId(null);
     } finally {
       setIsStartingJob(false);
     }
@@ -521,6 +560,22 @@ export default function ListGuardPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
+          {/* Worker Health Status Badge */}
+          <div
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border shadow-2xs transition-all"
+            style={{
+              backgroundColor: workerHealth?.available ? '#ecfdf5' : '#fef2f2',
+              borderColor: workerHealth?.available ? '#a7f3d0' : '#fecaca',
+              color: workerHealth?.available ? '#065f46' : '#991b1b'
+            }}
+          >
+            <span
+              className="w-2 h-2 rounded-full animate-pulse"
+              style={{ backgroundColor: workerHealth?.available ? '#10b981' : '#ef4444' }}
+            />
+            Worker: {workerHealth?.available ? 'Online' : 'Unavailable'}
+          </div>
+
           <button
             onClick={() => setIsGuideModalOpen(true)}
             className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-[#e0c0b2] bg-white text-sm font-medium text-[#14385f] hover:bg-[#f9ece1] transition-colors shadow-xs"
@@ -542,6 +597,25 @@ export default function ListGuardPage() {
           )}
         </div>
       </div>
+
+      {/* Job Start Error Banner */}
+      {jobStartError && (
+        <div className="mb-6 p-4 rounded-xl border border-rose-300 bg-rose-50 text-rose-900 text-sm flex items-start justify-between gap-3 shadow-xs">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-rose-950">Failed to Start Verification</p>
+              <p className="text-xs text-rose-800 mt-1">{jobStartError}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setJobStartError(null)}
+            className="text-xs text-rose-600 hover:text-rose-900 font-bold px-2 py-1 rounded"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* ========================================================= */}
       {/* ACTIVE VERIFICATION MODAL / BANNER (IF JOB RUNNING)       */}
@@ -607,6 +681,23 @@ export default function ListGuardPage() {
               <span className="text-base font-bold text-[#201b14]">{activeJob.reusedFromCache}</span>
             </div>
           </div>
+
+          {/* Unknown Reason Distribution */}
+          {activeJob.unknownReasons && Object.keys(activeJob.unknownReasons).length > 0 && (
+            <div className="mt-3 pt-2.5 border-t border-[#e0c0b2]/50 text-xs">
+              <span className="text-[#584238] font-medium">Unknown Reason Breakdown:</span>
+              <div className="flex flex-wrap gap-2 mt-1.5">
+                {Object.entries(activeJob.unknownReasons).map(([reason, count]) => (
+                  <span
+                    key={reason}
+                    className="px-2 py-0.5 rounded bg-[#f9ece1] text-[#201b14] font-mono text-[11px] border border-[#e0c0b2]"
+                  >
+                    {reason}: <strong className="text-[#f16f21]">{count as number}</strong>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

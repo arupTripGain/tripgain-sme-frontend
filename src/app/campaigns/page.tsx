@@ -2,11 +2,30 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Megaphone, Users, Mail, Trash2, AlertTriangle, Loader2, User, Rocket, Play, Pause, Copy } from 'lucide-react';
+import { Plus, Megaphone, Users, Mail, Trash2, AlertTriangle, Loader2, User, Rocket, Play, Pause, Copy, CheckCircle2, Check, Layers } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
+
+export interface StepProgressItem {
+  stepId: string;
+  stepNumber: number;
+  stepName: string;
+  eligibleCount: number;
+  sentCount: number;
+  remainingCount: number;
+  completionPercentage: number;
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+}
+
+export interface CampaignCompletionInfo {
+  completed: boolean;
+  totalSteps: number;
+  completedSteps: number;
+  totalEligibleContacts: number;
+  completedContacts: number;
+}
 
 export default function CampaignsPage() {
   const { user } = useAuth();
@@ -194,7 +213,12 @@ export default function CampaignsPage() {
                       <h3 className="font-heading text-lg font-bold text-secondary group-hover:text-primary transition-colors">
                         {campaign.name}
                       </h3>
-                      {campaign.status === 'active' ? (
+                      {campaign.campaignCompletion?.completed ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20 shadow-xs">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          Completed
+                        </span>
+                      ) : campaign.status === 'active' ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700 ring-1 ring-inset ring-green-600/20 shadow-sm">
                           <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
                           Active
@@ -353,6 +377,99 @@ export default function CampaignsPage() {
                 </div>
 
               </div>
+
+              {/* Step Progress Section */}
+              {Array.isArray(campaign.stepProgress) && campaign.stepProgress.length > 0 && (
+                <div className="mt-4 pt-3.5 border-t border-border/60 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Layers className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground font-heading">
+                        Step Progress
+                      </span>
+                    </div>
+
+                    {campaign.campaignCompletion?.completed ? (
+                      <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50/90 border border-emerald-200 px-3 py-0.5 rounded-full shadow-2xs">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>✓ Campaign Completed · All {campaign.campaignCompletion.totalSteps} steps completed</span>
+                        {campaign.campaignCompletion.completedContacts > 0 && (
+                          <span className="text-emerald-800/80 font-mono text-[11px] ml-1">
+                            ({campaign.campaignCompletion.completedContacts.toLocaleString()} / {campaign.campaignCompletion.totalEligibleContacts.toLocaleString()} contacts)
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+                        <span>
+                          {campaign.campaignCompletion?.completedSteps ?? campaign.stepProgress.filter((s: any) => s.status === 'COMPLETED').length} of {campaign.campaignCompletion?.totalSteps ?? campaign.stepProgress.length} steps completed
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-0.5">
+                    {campaign.stepProgress.map((step: StepProgressItem) => (
+                      <div 
+                        key={step.stepId || step.stepNumber} 
+                        className="flex items-center justify-between gap-2.5 py-1.5 px-3 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors border border-border/30 text-xs"
+                      >
+                        {/* Step Label, Name & Status */}
+                        <div className="flex items-center gap-1.5 min-w-0 max-w-[42%] shrink">
+                          <span className="font-bold text-secondary text-xs shrink-0">Step {step.stepNumber}</span>
+                          <span className="text-muted-foreground font-medium truncate" title={step.stepName}>
+                            {step.stepName}
+                          </span>
+                          {step.status === 'COMPLETED' ? (
+                            <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.2 text-[10px] font-semibold text-emerald-700 border border-emerald-200 shrink-0">
+                              <Check className="w-2.5 h-2.5" />
+                              Done
+                            </span>
+                          ) : step.status === 'IN_PROGRESS' ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.2 text-[10px] font-semibold text-primary border border-primary/20 shrink-0">
+                              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                              Active
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.2 text-[10px] font-medium text-muted-foreground border border-border shrink-0">
+                              Idle
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Centered Horizontal Progress Bar */}
+                        <div className="flex-1 min-w-[50px] max-w-[130px] mx-1">
+                          <div className="h-1.5 w-full bg-muted/80 rounded-full overflow-hidden border border-border/40">
+                            <div 
+                              className={cn(
+                                "h-full rounded-full transition-all duration-500",
+                                step.status === 'COMPLETED' ? "bg-emerald-500" :
+                                step.status === 'IN_PROGRESS' ? "bg-primary" : "bg-muted-foreground/20"
+                              )}
+                              style={{ width: `${Math.min(100, Math.max(0, step.completionPercentage))}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Sent Count and Percentage */}
+                        <div className="flex items-center justify-end gap-1.5 font-mono text-[11px] shrink-0 text-right">
+                          <span className="text-muted-foreground">
+                            <strong className="text-secondary font-semibold">{step.sentCount.toLocaleString()}</strong>/{step.eligibleCount.toLocaleString()}
+                          </span>
+                          <span className="text-muted-foreground/30">·</span>
+                          <span className={cn(
+                            "font-bold min-w-[32px]",
+                            step.status === 'COMPLETED' ? "text-emerald-600" :
+                            step.status === 'IN_PROGRESS' ? "text-primary" : "text-muted-foreground"
+                          )}>
+                            {step.completionPercentage}%
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

@@ -175,26 +175,44 @@ export function LeadDetailDrawer({ leadId, onClose, onStatusUpdated }: LeadDetai
                 {/* Company & Normalization Section */}
                 <div className="space-y-3">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <Building2 className="w-3.5 h-3.5 text-primary" /> Company Profile & Normalization
+                    <Building2 className="w-3.5 h-3.5 text-primary" /> Company Profile & Exhibitor Metadata
                   </h3>
                   <div className="bg-muted/20 border border-border rounded-xl p-4 space-y-2.5 text-xs">
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <span className="text-muted-foreground block text-[11px]">Display Name:</span>
                         <span className="font-semibold text-foreground">{lead.companyName}</span>
+                        {lead.rawName && lead.rawName !== lead.companyName && (
+                          <span className="text-[10px] text-muted-foreground block">Raw: {lead.rawName}</span>
+                        )}
                       </div>
                       <div>
-                        <span className="text-muted-foreground block text-[11px]">Normalized Search Key:</span>
+                        <span className="text-muted-foreground block text-[11px]">Normalized Key:</span>
                         <span className="font-mono bg-card px-1.5 py-0.5 rounded border border-border text-[11px] text-foreground">
                           {lead.companyNormalizedName || '—'}
                         </span>
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/60">
+                      <div>
+                        <span className="text-muted-foreground block text-[11px]">Booth #:</span>
+                        <span className="font-mono font-medium text-foreground">{lead.boothNumber || '—'}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-[11px]">Hall #:</span>
+                        <span className="font-mono font-medium text-foreground">{lead.hallNumber || '—'}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-[11px]">Category:</span>
+                        <span className="text-foreground truncate block">{lead.category || '—'}</span>
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60">
                       <div>
                         <span className="text-muted-foreground block text-[11px]">Domain:</span>
-                        <span className="text-foreground">{lead.domain || '—'}</span>
+                        <span className="font-mono text-foreground">{lead.domain || '—'}</span>
                       </div>
                       <div>
                         <span className="text-muted-foreground block text-[11px]">Website URL:</span>
@@ -206,14 +224,136 @@ export function LeadDetailDrawer({ leadId, onClose, onStatusUpdated }: LeadDetai
                       </div>
                     </div>
 
+                    {lead.detailUrl && (
+                      <div className="pt-2 border-t border-border/60">
+                        <span className="text-muted-foreground block text-[11px]">Exhibitor Profile URL:</span>
+                        <a href={lead.detailUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline flex items-center gap-1 text-[11px] truncate">
+                          {lead.detailUrl} <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Evidence-Based Resolution Card */}
+                <div className="space-y-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-primary" /> Evidence-Based Company Resolution
+                  </h3>
+                  <div className="bg-card border border-border rounded-xl p-4 space-y-3 text-xs shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground text-[11px]">Status:</span>
+                        {(() => {
+                          const status = lead.resolutionStatus || 'UNRESOLVED';
+                          switch (status) {
+                            case 'RESOLVED_HIGH':
+                              return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">RESOLVED (High)</span>;
+                            case 'RESOLVED_MEDIUM':
+                              return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">RESOLVED (Medium)</span>;
+                            case 'RESOLVED_LOW':
+                              return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-yellow-50 text-yellow-700 border border-yellow-200">RESOLVED (Low)</span>;
+                            case 'REVIEW_REQUIRED':
+                              return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">REVIEW REQUIRED</span>;
+                            default:
+                              return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-muted text-muted-foreground border border-border">UNRESOLVED</span>;
+                          }
+                        })()}
+                      </div>
+                      <div className="text-right">
+                        <span className="text-muted-foreground text-[11px]">Source: </span>
+                        <span className="font-semibold text-foreground">
+                          {lead.resolutionSource || 'NONE'}
+                        </span>
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60">
                       <div>
-                        <span className="text-muted-foreground block text-[11px]">Industry / Sector:</span>
-                        <span className="text-foreground">{lead.industry || '—'}</span>
+                        <span className="text-muted-foreground block text-[11px]">Criteria Matched:</span>
+                        <span className="text-foreground text-[11px]">
+                          {lead.resolutionEvidence?.criteriaMatched?.join(', ') || (lead.resolutionStatus === 'UNRESOLVED' ? 'No evidence' : 'Direct Signal')}
+                        </span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground block text-[11px]">Company Size:</span>
-                        <span className="text-foreground">{lead.companySize || '—'}</span>
+                        <span className="text-muted-foreground block text-[11px]">Resolved At:</span>
+                        <span className="text-foreground">
+                          {lead.resolvedAt ? new Date(lead.resolvedAt).toLocaleString() : '—'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Evidence JSON Viewer */}
+                    {lead.resolutionEvidence && (
+                      <div className="pt-2 border-t border-border/60">
+                        <span className="text-muted-foreground block text-[11px] mb-1 font-semibold">
+                          Resolution Evidence & Candidate Domains:
+                        </span>
+                        <pre className="p-2.5 rounded bg-muted/30 border border-border text-[11px] font-mono text-foreground overflow-x-auto max-h-36">
+                          {typeof lead.resolutionEvidence === 'string'
+                            ? lead.resolutionEvidence
+                            : JSON.stringify(lead.resolutionEvidence, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+
+                    {/* Human Review Resolution Overrides */}
+                    <div className="pt-2 border-t border-border/60 space-y-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
+                        Manual Resolution Override
+                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={async () => {
+                            const manualDomain = prompt('Enter verified company domain (e.g. acme.com):', lead.domain || '');
+                            if (!manualDomain) return;
+                            try {
+                              const res = await apiFetch(`/api/lead-intelligence/leads/${lead.id}/review-resolution`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  resolutionStatus: 'RESOLVED_HIGH',
+                                  domain: manualDomain.trim(),
+                                  websiteUrl: `https://${manualDomain.trim()}`,
+                                  notes: 'Human review override'
+                                })
+                              });
+                              const data = await res.json();
+                              if (!res.ok) throw new Error(data.error || 'Failed to update resolution');
+                              setLead(data.lead);
+                              if (onStatusUpdated) onStatusUpdated();
+                            } catch (err: any) {
+                              alert(`Error: ${err.message}`);
+                            }
+                          }}
+                          className="px-2.5 py-1 text-[11px] font-semibold rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                        >
+                          Set Verified Domain
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!confirm('Mark this company as UNRESOLVED?')) return;
+                            try {
+                              const res = await apiFetch(`/api/lead-intelligence/leads/${lead.id}/review-resolution`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  resolutionStatus: 'UNRESOLVED',
+                                  notes: 'Marked unresolved by reviewer'
+                                })
+                              });
+                              const data = await res.json();
+                              if (!res.ok) throw new Error(data.error || 'Failed to mark unresolved');
+                              setLead(data.lead);
+                              if (onStatusUpdated) onStatusUpdated();
+                            } catch (err: any) {
+                              alert(`Error: ${err.message}`);
+                            }
+                          }}
+                          className="px-2.5 py-1 text-[11px] font-semibold rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        >
+                          Mark Unresolved
+                        </button>
                       </div>
                     </div>
                   </div>

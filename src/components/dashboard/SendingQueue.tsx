@@ -59,13 +59,17 @@ export function SendingQueue() {
     try {
       const url = forceRefresh ? '/api/dashboard/sending-queue?force=true' : '/api/dashboard/sending-queue';
       const res = await apiFetch(url);
+      if (res.status === 401) {
+        // Not authenticated yet or redirecting; quietly exit
+        return;
+      }
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
       }
       const json: SendingQueueData = await res.json();
       setData(json);
     } catch (err: any) {
-      console.error('Failed to load sending queue summary:', err);
+      console.warn('Failed to load sending queue summary:', err?.message || err);
       setError('Queue data unavailable');
     } finally {
       setLoading(false);
