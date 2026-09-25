@@ -259,7 +259,7 @@ export default function BulkCampaignDetailPage() {
               )}
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              Audience: <strong className="text-slate-700">{campaign.list?.name || 'Manual List'}</strong> • Mailbox Pool: <strong className="text-slate-700">{campaign.senderMailboxes?.length || 0} mailboxes</strong> • Daily Limit: <strong className="text-slate-700">{campaign.dailySendLimit}/day</strong>
+              Audience: <strong className="text-slate-700">{campaign.lists && campaign.lists.length > 0 ? campaign.lists.map((l: any) => l.name).join(', ') : (campaign.list?.name || 'Manual List')}</strong> • Mailbox Pool: <strong className="text-slate-700">{campaign.senderMailboxes?.length || 0} mailboxes</strong> • Daily Limit: <strong className="text-slate-700">{campaign.dailySendLimit}/day</strong>
             </p>
           </div>
         </div>

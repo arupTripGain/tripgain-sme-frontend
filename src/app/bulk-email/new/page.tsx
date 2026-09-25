@@ -94,7 +94,9 @@ export default function NewBulkCampaignPage() {
   // Step 1: Details & Audience
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedListId, setSelectedListId] = useState('');
+  const [selectedListIds, setSelectedListIds] = useState<string[]>([]);
+  const [listSearch, setListSearch] = useState('');
+  const selectedListId = selectedListIds[0] || '';
   const [audienceContacts, setAudienceContacts] = useState<any[]>([]);
   const [isLoadingContacts, setIsLoadingContacts] = useState(false);
 
@@ -151,19 +153,76 @@ export default function NewBulkCampaignPage() {
       .catch(console.error);
   }, []);
 
-  // Fetch contacts for selected audience list
+  const toggleListSelection = (id: string) => {
+    setSelectedListIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const selectAllLists = () => {
+    setSelectedListIds(lists.map(l => l.id));
+  };
+
+  const clearAllLists = () => {
+    setSelectedListIds([]);
+  };
+
+  const filteredLists = useMemo(() => {
+    if (!listSearch.trim()) return lists;
+    return lists.filter(l => l.name?.toLowerCase().includes(listSearch.toLowerCase().trim()));
+  }, [lists, listSearch]);
+
+  // Fetch contacts for selected audience lists with deduplication across lists
   useEffect(() => {
-    if (selectedListId && selectedListId !== 'suppression-1') {
+    const validListIds = selectedListIds.filter(id => id && id !== 'suppression-1');
+    if (validListIds.length > 0) {
       setIsLoadingContacts(true);
-      apiFetch(`/api/lists/${selectedListId}`)
-        .then(res => res.json())
-        .then(data => {
-          const cts = Array.isArray(data?.contacts) ? data.contacts : [];
-          setAudienceContacts(cts);
-          if (cts.length > 0) {
-            setPreviewContactId(cts[0].id);
-            // Default first 2 contacts for test if none selected
-            setSelectedTestContactIds(prev => prev.length === 0 ? cts.slice(0, Math.min(2, cts.length)).map((c: any) => c.id) : prev);
+      Promise.all(
+        validListIds.map(id =>
+          apiFetch(`/api/lists/${id}`)
+            .then(res => res.json())
+            .catch(() => null)
+        )
+      )
+        .then(results => {
+          const seenIds = new Set<string>();
+          const seenEmails = new Set<string>();
+          const allContacts: any[] = [];
+
+          for (const data of results) {
+            if (!data) continue;
+            const cts = Array.isArray(data?.contacts)
+              ? data.contacts
+              : Array.isArray(data?.members)
+              ? data.members.map((m: any) => m.contact)
+              : [];
+
+            for (const c of cts) {
+              if (!c) continue;
+              const email = (c.email || c.emails?.[0]?.email || '').toLowerCase().trim();
+              if (c.id && seenIds.has(c.id)) continue;
+              if (email && seenEmails.has(email)) continue;
+
+              if (c.id) seenIds.add(c.id);
+              if (email) seenEmails.add(email);
+
+              allContacts.push({
+                ...c,
+                name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || c.name || 'Recipient',
+                email: email || c.email || '',
+                company: c.company || c.companyName || c.organization?.name || '',
+                title: c.title || c.jobTitle || '',
+                city: c.city || ''
+              });
+            }
+          }
+
+          setAudienceContacts(allContacts);
+          if (allContacts.length > 0) {
+            setPreviewContactId(prev => prev && allContacts.some(c => c.id === prev) ? prev : allContacts[0].id);
+            setSelectedTestContactIds(prev => prev.length === 0 ? allContacts.slice(0, Math.min(2, allContacts.length)).map(c => c.id) : prev);
+          } else {
+            setPreviewContactId('');
           }
         })
         .catch(err => {
@@ -175,7 +234,7 @@ export default function NewBulkCampaignPage() {
       setAudienceContacts([]);
       setPreviewContactId('');
     }
-  }, [selectedListId]);
+  }, [selectedListIds]);
 
   const handleInsertVariable = (tag: string) => {
     setBody(prev => {
@@ -196,7 +255,8 @@ export default function NewBulkCampaignPage() {
       const payload = {
         name: name.trim(),
         description: description.trim(),
-        listId: selectedListId || null,
+        listId: selectedListIds[0] || null,
+        listIds: selectedListIds,
         subjectTemplate: subject.trim(),
         bodyHtmlTemplate: body,
         senderMailboxes: selectedMailboxes,
@@ -241,7 +301,8 @@ export default function NewBulkCampaignPage() {
   const fetchPreflightAudit = async (cid: string) => {
     setIsFetchingPreflight(true);
     try {
-      const res = await apiFetch(`/api/bulk-campaigns/${cid}/preflight`);
+      const query = selectedListIds.length > 0 ? `?listIds=${selectedListIds.join(',')}` : '';
+      const res = await apiFetch(`/api/bulk-campaigns/${cid}/preflight${query}`);
       if (res.ok) {
         const data = await res.json();
         setPreflightData(data);
@@ -259,8 +320,8 @@ export default function NewBulkCampaignPage() {
         alert('Campaign name is required.');
         return;
       }
-      if (!selectedListId) {
-        alert('Please select an Audience list.');
+      if (selectedListIds.length === 0) {
+        alert('Please select at least one Audience list.');
         return;
       }
       const saved = await handleSaveDraft();
@@ -564,42 +625,138 @@ export default function NewBulkCampaignPage() {
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                Select Audience List <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={selectedListId}
-                onChange={e => setSelectedListId(e.target.value)}
-                className="w-full text-sm px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-              >
-                <option value="">-- Choose a verified contact list --</option>
-                {lists.map(l => {
-                  const count = typeof l.contacts === 'number'
-                    ? l.contacts
-                    : (l.contactCount ?? l._count?.contacts ?? l._count?.members ?? (Array.isArray(l.contacts) ? l.contacts.length : 0));
-                  return (
-                    <option key={l.id} value={l.id}>
-                      {l.name} — {count} contacts
-                    </option>
-                  );
-                })}
-              </select>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                  Select Audience Lists <span className="text-red-500">*</span>
+                </label>
+                {lists.length > 0 && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={selectAllLists}
+                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+                    >
+                      Select All
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button
+                      type="button"
+                      onClick={clearAllLists}
+                      className="text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Quick filter if multiple lists */}
+              {lists.length > 2 && (
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search audience lists..."
+                    value={listSearch}
+                    onChange={e => setListSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+              )}
+
+              {/* Scrollable list options with individual contact counts */}
+              <div className="border border-slate-200 rounded-lg max-h-56 overflow-y-auto divide-y divide-slate-100 bg-white">
+                {filteredLists.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-slate-400">
+                    No audience lists found.
+                  </div>
+                ) : (
+                  filteredLists.map(l => {
+                    const isSelected = selectedListIds.includes(l.id);
+                    const count = typeof l.contacts === 'number'
+                      ? l.contacts
+                      : (l.contactCount ?? l._count?.contacts ?? l._count?.members ?? (Array.isArray(l.contacts) ? l.contacts.length : 0));
+                    return (
+                      <div
+                        key={l.id}
+                        onClick={() => toggleListSelection(l.id)}
+                        className={cn(
+                          "flex items-center justify-between px-3.5 py-2.5 cursor-pointer transition-colors text-sm select-none",
+                          isSelected ? "bg-indigo-50/70 hover:bg-indigo-50" : "hover:bg-slate-50"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {}}
+                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 pointer-events-none"
+                          />
+                          <span className={cn("text-xs font-medium", isSelected ? "text-indigo-900 font-semibold" : "text-slate-700")}>
+                            {l.name}
+                          </span>
+                        </div>
+                        <span className={cn(
+                          "text-[11px] px-2 py-0.5 rounded-full font-medium",
+                          isSelected ? "bg-indigo-100 text-indigo-700 font-semibold" : "bg-slate-100 text-slate-500"
+                        )}>
+                          {count.toLocaleString()} contacts
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Selected List Chips */}
+              {selectedListIds.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {selectedListIds.map(id => {
+                    const l = lists.find(item => item.id === id);
+                    if (!l) return null;
+                    return (
+                      <span
+                        key={id}
+                        className="inline-flex items-center gap-1.5 text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-full font-medium"
+                      >
+                        {l.name}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); toggleListSelection(id); }}
+                          className="text-indigo-400 hover:text-indigo-700 ml-0.5"
+                          title="Remove list"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
 
               {isLoadingContacts ? (
                 <div className="flex items-center gap-2 mt-2 text-xs text-indigo-600">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  Loading audience contacts...
+                  Loading contacts across {selectedListIds.length} list{selectedListIds.length > 1 ? 's' : ''}...
                 </div>
-              ) : selectedListId && audienceContacts.length > 0 ? (
-                <div className="mt-2 text-xs text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-md border border-emerald-200 flex items-center gap-2">
-                  <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  Loaded {audienceContacts.length} contacts available for preview and safe test sending.
+              ) : selectedListIds.length > 0 && audienceContacts.length > 0 ? (
+                <div className="mt-2 text-xs text-emerald-700 bg-emerald-50 px-3 py-2 rounded-md border border-emerald-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <span>
+                      Loaded <strong>{audienceContacts.length.toLocaleString()} unique contacts</strong> from <strong>{selectedListIds.length} list{selectedListIds.length > 1 ? 's' : ''}</strong> available for preview and safe test sending.
+                    </span>
+                  </div>
+                </div>
+              ) : selectedListIds.length > 0 && !isLoadingContacts && audienceContacts.length === 0 ? (
+                <div className="mt-2 text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-md border border-amber-200">
+                  Selected list(s) currently contain no contacts.
                 </div>
               ) : null}
 
-              <p className="text-[11px] text-slate-500 mt-1.5">
-                Only verified audience lists are supported. List counts are strictly scoped to your workspace.
+              <p className="text-[11px] text-slate-500 mt-1">
+                Select one or more verified audience lists. Contacts appearing in multiple lists are automatically deduplicated.
               </p>
             </div>
           </div>

@@ -367,7 +367,7 @@ export default function CampaignDashboardPage() {
                 <div className="w-1 h-1 rounded-full bg-border"></div>
                 <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                   <Users className="w-3.5 h-3.5" /> 
-                  Audience: <span className="text-secondary">{campaign.list?.name || 'Unknown'}</span>
+                  Audience: <span className="text-secondary">{campaign.lists && campaign.lists.length > 0 ? campaign.lists.map((l: any) => l.name).join(', ') : (campaign.list?.name || 'Unknown')}</span>
                 </span>
               </div>
             </div>
@@ -504,7 +504,7 @@ export default function CampaignDashboardPage() {
                     <span className="text-[11px] font-normal text-muted-foreground">• Ready to sequence</span>
                   </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Target audience: <span className="font-semibold text-secondary">{campaign.list?.name || 'Assigned List'}</span>. Launching will enroll all eligible contacts into the sequence and activate automated email outreach.
+                    Target audience: <span className="font-semibold text-secondary">{campaign.lists && campaign.lists.length > 0 ? campaign.lists.map((l: any) => l.name).join(', ') : (campaign.list?.name || 'Assigned List')}</span>. Launching will enroll all eligible contacts into the sequence and activate automated email outreach.
                   </p>
                 </div>
               </div>
@@ -754,7 +754,7 @@ export default function CampaignDashboardPage() {
                                     Campaign is currently in Draft
                                   </p>
                                   <p className="text-xs text-muted-foreground max-w-md text-center leading-relaxed">
-                                    Leads have not been enrolled yet. Launching the campaign will enroll all eligible contacts from <span className="font-semibold text-secondary">{campaign.list?.name || 'your audience list'}</span> into the sequence and start automated outreach.
+                                    Leads have not been enrolled yet. Launching the campaign will enroll all eligible contacts from <span className="font-semibold text-secondary">{campaign.lists && campaign.lists.length > 0 ? campaign.lists.map((l: any) => l.name).join(', ') : (campaign.list?.name || 'your audience list')}</span> into the sequence and start automated outreach.
                                   </p>
                                   <button
                                     onClick={handleLaunchCampaign}

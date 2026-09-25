@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Save, Plus, Play, Clock, Mail, Trash2, CheckCircle2, AlertCircle, X, Eye, Check, Sparkles, ChevronDown, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Play, Clock, Mail, Trash2, CheckCircle2, AlertCircle, X, Eye, Check, Sparkles, ChevronDown, Loader2, Search, UserCheck } from 'lucide-react';
 import dynamic from 'next/dynamic';
 const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
 import 'react-quill-new/dist/quill.snow.css';
@@ -80,13 +80,33 @@ export default function CampaignComposerPage() {
 
   // 2. Audience State
   const [audienceType, setAudienceType] = useState<'list' | 'smart'>('list');
-  const [selectedListId, setSelectedListId] = useState('');
+  const [selectedListIds, setSelectedListIds] = useState<string[]>([]);
+  const [listSearch, setListSearch] = useState('');
+  const selectedListId = selectedListIds[0] || '';
   const [selectedList, setSelectedList] = useState<any>(null);
   const [audienceRules, setAudienceRules] = useState({
     city: '',
     jobTitle: '',
     industry: ''
   });
+
+  const toggleListSelection = (id: string) => {
+    setSelectedListIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const selectAllLists = () => {
+    setSelectedListIds(lists.map(l => l.id));
+  };
+
+  const clearAllLists = () => {
+    setSelectedListIds([]);
+  };
+
+  const filteredLists = lists.filter((l: any) => 
+    !listSearch.trim() || l.name?.toLowerCase().includes(listSearch.toLowerCase().trim())
+  );
 
   // 3. Schedule & Limits State
   const [schedule, setSchedule] = useState({
@@ -158,8 +178,8 @@ export default function CampaignComposerPage() {
     if (step === 2) {
       // Calculate eligibility
       const params = new URLSearchParams();
-      if (audienceType === 'list' && selectedListId) {
-        params.append('listId', selectedListId);
+      if (audienceType === 'list' && selectedListIds.length > 0) {
+        params.append('listIds', selectedListIds.join(','));
       } else if (audienceType === 'smart') {
         params.append('rules', JSON.stringify(audienceRules));
       }
@@ -173,16 +193,17 @@ export default function CampaignComposerPage() {
         setEligibility(null);
       }
     }
-  }, [audienceType, selectedListId, audienceRules, step]);
+  }, [audienceType, selectedListIds, audienceRules, step]);
 
   const handleListChange = async (listId: string) => {
-    setSelectedListId(listId);
-    if (!listId) {
+    if (listId) {
+      setSelectedListIds([listId]);
+      const list = lists.find(l => l.id === listId);
+      setSelectedList(list);
+    } else {
+      setSelectedListIds([]);
       setSelectedList(null);
-      return;
     }
-    const list = lists.find(l => l.id === listId);
-    setSelectedList(list);
   };
 
   const addSequenceStep = (type: 'email' | 'wait') => {
@@ -314,7 +335,8 @@ export default function CampaignComposerPage() {
           ...settings,
           ...schedule,
           ...content,
-          listId: audienceType === 'list' ? selectedListId : null,
+          listId: audienceType === 'list' ? (selectedListIds[0] || null) : null,
+          listIds: audienceType === 'list' ? selectedListIds : [],
           audienceRules: audienceType === 'smart' ? audienceRules : null,
           dailySendLimit: schedule.dailyLimit,
           hourlySendLimit: schedule.hourlyLimit,
@@ -351,7 +373,8 @@ export default function CampaignComposerPage() {
           ...settings,
           ...schedule,
           ...content,
-          listId: audienceType === 'list' ? selectedListId : null,
+          listId: audienceType === 'list' ? (selectedListIds[0] || null) : null,
+          listIds: audienceType === 'list' ? selectedListIds : [],
           audienceRules: audienceType === 'smart' ? audienceRules : null,
           dailySendLimit: schedule.dailyLimit,
           hourlySendLimit: schedule.hourlyLimit,
@@ -469,12 +492,109 @@ export default function CampaignComposerPage() {
                     </div>
 
                     {audienceType === 'list' ? (
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-secondary">Target List</label>
-                        <select value={selectedListId} onChange={e => handleListChange(e.target.value)} className="w-full h-11 px-3 rounded-md border border-input focus:ring-1 focus:ring-primary outline-none">
-                          <option value="">-- Choose a list --</option>
-                          {lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                        </select>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="text-sm font-medium text-secondary">Target Lists</label>
+                          {lists.length > 0 && (
+                            <div className="flex items-center gap-2 text-xs">
+                              <button
+                                type="button"
+                                onClick={selectAllLists}
+                                className="text-primary hover:underline font-medium"
+                              >
+                                Select All
+                              </button>
+                              <span className="text-muted-foreground">|</span>
+                              <button
+                                type="button"
+                                onClick={clearAllLists}
+                                className="text-muted-foreground hover:text-foreground font-medium"
+                              >
+                                Clear
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Search filter if lists > 2 */}
+                        {lists.length > 2 && (
+                          <div className="relative">
+                            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                            <input
+                              type="text"
+                              placeholder="Search audience lists..."
+                              value={listSearch}
+                              onChange={e => setListSearch(e.target.value)}
+                              className="w-full pl-8 pr-3 py-1.5 text-xs bg-background border border-input rounded-md focus:ring-1 focus:ring-primary outline-none"
+                            />
+                          </div>
+                        )}
+
+                        {/* Multi-list scrollable selection container */}
+                        <div className="border border-input rounded-md max-h-52 overflow-y-auto divide-y divide-border bg-card">
+                          {filteredLists.length === 0 ? (
+                            <div className="p-4 text-center text-xs text-muted-foreground">
+                              No audience lists found.
+                            </div>
+                          ) : (
+                            filteredLists.map(l => {
+                              const isSelected = selectedListIds.includes(l.id);
+                              const count = typeof l.contacts === 'number'
+                                ? l.contacts
+                                : (l.contactCount ?? l._count?.contacts ?? l._count?.members ?? (Array.isArray(l.contacts) ? l.contacts.length : 0));
+                              return (
+                                <div
+                                  key={l.id}
+                                  onClick={() => toggleListSelection(l.id)}
+                                  className={`flex items-center justify-between px-3 py-2 cursor-pointer transition-colors text-sm select-none ${
+                                    isSelected ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-muted/50'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => {}}
+                                      className="rounded border-input text-primary focus:ring-primary h-4 w-4 pointer-events-none"
+                                    />
+                                    <span className={`text-xs font-medium ${isSelected ? 'text-primary font-semibold' : 'text-foreground'}`}>
+                                      {l.name}
+                                    </span>
+                                  </div>
+                                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                    {count.toLocaleString()} contacts
+                                  </span>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+
+                        {/* Selected list chips */}
+                        {selectedListIds.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {selectedListIds.map(id => {
+                              const l = lists.find(item => item.id === id);
+                              if (!l) return null;
+                              return (
+                                <span
+                                  key={id}
+                                  className="inline-flex items-center gap-1.5 text-xs bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 rounded-full font-medium"
+                                >
+                                  {l.name}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); toggleListSelection(id); }}
+                                    className="text-primary/60 hover:text-primary ml-0.5"
+                                    title="Remove list"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-4">
@@ -528,7 +648,7 @@ export default function CampaignComposerPage() {
               </div>
               <div className="flex justify-between">
                 <button onClick={() => setStep(1)} className="px-6 py-2 rounded-md border border-border text-sm font-medium hover:bg-muted transition-colors">Back</button>
-                <button onClick={() => setStep(3)} disabled={audienceType === 'list' ? !selectedListId : (!audienceRules.industry && !audienceRules.jobTitle && !audienceRules.city)} className="px-6 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">Continue to Schedule & Limits</button>
+                <button onClick={() => setStep(3)} disabled={audienceType === 'list' ? selectedListIds.length === 0 : (!audienceRules.industry && !audienceRules.jobTitle && !audienceRules.city)} className="px-6 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">Continue to Schedule & Limits</button>
               </div>
             </div>
           )}
