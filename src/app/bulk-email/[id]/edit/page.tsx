@@ -1,18 +1,18 @@
 "use client";
 
 import { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import BulkCampaignWizard from '@/components/BulkCampaignWizard';
 import { Loader2 } from 'lucide-react';
 
-function NewBulkCampaignContent() {
-  const searchParams = useSearchParams();
-  const campaignId = searchParams?.get('id') || null;
+function EditBulkCampaignContent() {
+  const params = useParams();
+  const campaignId = params?.id as string;
 
   return <BulkCampaignWizard initialCampaignId={campaignId} />;
 }
 
-export default function NewBulkCampaignPage() {
+export default function EditBulkCampaignPage() {
   return (
     <Suspense
       fallback={
@@ -21,7 +21,7 @@ export default function NewBulkCampaignPage() {
         </div>
       }
     >
-      <NewBulkCampaignContent />
+      <EditBulkCampaignContent />
     </Suspense>
   );
 }

@@ -318,9 +318,12 @@ export default function BulkEmailDashboardPage() {
                         {camp.name}
                       </h3>
                       {getStatusBadge(camp.status)}
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                        {camp.stepsCount || camp.steps?.length || 1} {(camp.stepsCount || camp.steps?.length || 1) === 1 ? 'Step' : 'Steps in Sequence'}
+                      </span>
                     </div>
                     <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-slate-500">
-                      <span>Audience List: <strong className="text-slate-700">{camp.list?.name || 'Manual / None'}</strong></span>
+                      <span>Audience: <strong className="text-slate-700">{camp.lists && camp.lists.length > 0 ? camp.lists.map((l: any) => l.name).join(', ') : (camp.list?.name || 'Manual / None')}</strong></span>
                       <span>•</span>
                       <span>Mailbox Pool: <strong className="text-slate-700">{mailboxesCount} {mailboxesCount === 1 ? 'mailbox' : 'mailboxes'}</strong></span>
                       <span>•</span>

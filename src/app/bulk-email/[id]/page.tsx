@@ -22,7 +22,9 @@ import {
   ShieldCheck,
   UserX,
   XCircle,
-  ExternalLink
+  ExternalLink,
+  Layers,
+  GitCommit
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -48,6 +50,7 @@ export default function BulkCampaignDetailPage() {
   // Test Email Drawer / Modal
   const [showTestModal, setShowTestModal] = useState(false);
   const [testEmailAddress, setTestEmailAddress] = useState('');
+  const [selectedTestStepNumber, setSelectedTestStepNumber] = useState<number>(1);
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
@@ -129,12 +132,22 @@ export default function BulkCampaignDetailPage() {
       const res = await apiFetch(`/api/bulk-campaigns/${campaignId}/test-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ testEmail: testEmailAddress.trim() })
+        body: JSON.stringify({ 
+          testEmail: testEmailAddress.trim(),
+          stepNumber: selectedTestStepNumber
+        })
       });
 
-      const data = await res.json();
+      const rawText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        throw new Error(`Server error (${res.status}): ${rawText.slice(0, 120)}`);
+      }
+
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to send test email');
+        throw new Error(data.error || `Failed to send test email (${res.status})`);
       }
 
       setTestResult({
@@ -274,6 +287,14 @@ export default function BulkCampaignDetailPage() {
             <RefreshCw className="w-4 h-4" />
           </button>
 
+          <Link
+            href={`/bulk-email/${campaignId}/edit`}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-all shadow-xs"
+          >
+            <ExternalLink className="w-3.5 h-3.5 text-orange-600" />
+            Edit Campaign
+          </Link>
+
           <button
             onClick={() => setShowTestModal(true)}
             className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-all shadow-sm"
@@ -386,6 +407,96 @@ export default function BulkCampaignDetailPage() {
         </div>
       </div>
 
+      {/* Sequence Cadence & Follow-up Timeline */}
+      {campaign.steps && campaign.steps.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+                <Layers className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  Sequence Cadence & Follow-ups
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
+                    {campaign.steps.length} {campaign.steps.length === 1 ? 'Step' : 'Steps'}
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Automated sequence steps scheduled across business sending windows with stop-on-reply logic.
+                </p>
+              </div>
+            </div>
+            {campaign.campaignCompletion && (
+              <div className="text-right">
+                <div className="text-xs font-semibold text-slate-700">
+                  {campaign.campaignCompletion.percentCompleted}% Completed
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  {campaign.campaignCompletion.completedRecipients} / {campaign.campaignCompletion.totalRecipients} recipients finished
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-1">
+            {campaign.steps.map((st: any) => {
+              const progress = campaign.stepProgress?.find((p: any) => p.stepNumber === st.stepNumber);
+              return (
+                <div
+                  key={st.id || st.stepNumber}
+                  className="bg-slate-50/70 border border-slate-200 rounded-xl p-4 flex flex-col justify-between space-y-3 relative hover:border-slate-300 transition-colors"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                        <GitCommit className="w-3.5 h-3.5 text-indigo-600" />
+                        Step {st.stepNumber}
+                      </span>
+                      <span className="text-[11px] px-2 py-0.5 rounded font-medium bg-white border border-slate-200 text-slate-600">
+                        {st.stepNumber === 1 ? 'Initial outreach' : `Wait ${st.delayDays} day${st.delayDays === 1 ? '' : 's'}`}
+                      </span>
+                    </div>
+
+                    <div className="text-xs font-semibold text-slate-800 line-clamp-1">
+                      {st.stepNumber === 1 
+                        ? (st.subject || 'Initial Email') 
+                        : (st.subject ? `Subject: ${st.subject}` : 'Replies in original thread')}
+                    </div>
+
+                    <div 
+                      className="text-[11px] text-slate-500 line-clamp-2 mt-1"
+                      dangerouslySetInnerHTML={{ __html: st.bodyHtml?.replace(/<[^>]+>/g, ' ') || 'No body content' }}
+                    />
+                  </div>
+
+                  {progress && (
+                    <div className="pt-2 border-t border-slate-200/60 grid grid-cols-4 gap-1 text-center text-[10px]">
+                      <div className="bg-white rounded p-1 border border-slate-100">
+                        <span className="text-slate-400 block font-medium">Sent</span>
+                        <span className="font-bold text-slate-800">{progress.sent || 0}</span>
+                      </div>
+                      <div className="bg-white rounded p-1 border border-slate-100">
+                        <span className="text-slate-400 block font-medium">Delivered</span>
+                        <span className="font-bold text-emerald-700">{progress.delivered || 0}</span>
+                      </div>
+                      <div className="bg-white rounded p-1 border border-slate-100">
+                        <span className="text-slate-400 block font-medium">Opens</span>
+                        <span className="font-bold text-indigo-700">{progress.opens || 0}</span>
+                      </div>
+                      <div className="bg-white rounded p-1 border border-slate-100">
+                        <span className="text-slate-400 block font-medium">Replies</span>
+                        <span className="font-bold text-purple-700">{progress.replies || 0}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Recipients Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden space-y-0">
         {/* Table Header with Status Filters */}
@@ -438,6 +549,7 @@ export default function BulkCampaignDetailPage() {
                   <th className="py-3 px-4">Recipient</th>
                   <th className="py-3 px-4">Company</th>
                   <th className="py-3 px-4">Assigned Mailbox</th>
+                  <th className="py-3 px-4">Step</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4">Dispatched At</th>
                   <th className="py-3 px-4">Engagement</th>
@@ -445,36 +557,44 @@ export default function BulkCampaignDetailPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {recipientsData.recipients.map((r) => {
+                {recipientsData.recipients.map((r, idx) => {
                   const contact = r.contact;
-                  const primaryEmail = contact?.emails?.find((e: any) => e.isPrimary)?.email || contact?.emails?.[0]?.email || 'Unknown';
-                  const company = contact?.organization?.name || '-';
+                  const primaryEmail = r.email || contact?.emails?.find((e: any) => e.isPrimary)?.email || contact?.emails?.[0]?.email || 'Unknown';
+                  const contactName = r.fullName || `${r.firstName || contact?.firstName || ''} ${r.lastName || contact?.lastName || ''}`.trim() || primaryEmail;
+                  const company = r.companyName || contact?.organization?.name || '-';
+                  const mailboxEmail = r.assignedMailbox || r.mailbox?.email || 'Dynamic fair rotation';
+                  const sentTime = r.sentAt || r.lastSentAt;
 
                   return (
-                    <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
+                    <tr key={r.id || r.enrollmentId || `recipient-${idx}`} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3 px-4">
-                        <div className="font-bold text-slate-800">{contact?.firstName || ''} {contact?.lastName || ''}</div>
+                        <div className="font-bold text-slate-800">{contactName}</div>
                         <div className="text-slate-500 text-[11px]">{primaryEmail}</div>
                       </td>
                       <td className="py-3 px-4 font-medium text-slate-700">{company}</td>
                       <td className="py-3 px-4 text-slate-600 font-mono text-[11px]">
-                        {r.mailbox?.email || 'Dynamic fair rotation'}
+                        {mailboxEmail}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded font-mono text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                          Step {r.currentStep || 1}
+                        </span>
                       </td>
                       <td className="py-3 px-4">
                         {getRecipientBadge(r.status)}
                       </td>
                       <td className="py-3 px-4 text-slate-500">
-                        {r.lastSentAt ? new Date(r.lastSentAt).toLocaleString() : '-'}
+                        {sentTime ? new Date(sentTime).toLocaleString() : '-'}
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3 text-slate-600 text-[11px]">
                           <span title="Opens" className="flex items-center gap-1">
                             <Eye className="w-3 h-3 text-slate-400" />
-                            {r.opensCount}
+                            {r.opensCount || 0}
                           </span>
                           <span title="Clicks" className="flex items-center gap-1">
                             <MousePointer className="w-3 h-3 text-slate-400" />
-                            {r.clicksCount}
+                            {r.clicksCount || 0}
                           </span>
                           {r.replied && (
                             <span title="Replied" className="text-purple-600 font-semibold flex items-center gap-0.5">
@@ -510,6 +630,25 @@ export default function BulkCampaignDetailPage() {
             </div>
 
             <div className="space-y-3">
+              {campaign?.steps && campaign.steps.length > 1 && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Select Sequence Step to Test
+                  </label>
+                  <select
+                    value={selectedTestStepNumber}
+                    onChange={e => setSelectedTestStepNumber(Number(e.target.value))}
+                    className="w-full text-xs font-medium px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  >
+                    {campaign.steps.map((st: any) => (
+                      <option key={st.stepNumber} value={st.stepNumber}>
+                        Step {st.stepNumber} {st.stepNumber === 1 ? '(Initial outreach)' : `(+${st.delayDays}d follow-up)`} {st.subject ? `— ${st.subject}` : '— (Thread reply)'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
                   Test Email Recipient
