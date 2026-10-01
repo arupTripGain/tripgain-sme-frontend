@@ -363,7 +363,7 @@ export default function BulkCampaignWizard({ initialCampaignId = null }: BulkCam
         stepName: `Follow-up ${nextNum - 1}`,
         delayDays: 2,
         subject: '',
-        body: '<p>Hi {{firstName}},</p><p><br></p><p>Following up on my previous note. Let me know if you would like to connect this week.</p><p><br></p><p style="font-size: 11px; color: #6b7280; border-top: 1px solid #e5e7eb; padding-top: 12px; margin-top: 24px;"><a href="{{unsubscribeLink}}">Unsubscribe</a> from future communications</p>'
+        body: '<p>Hi {{firstName}},</p><p><br></p><p><br></p><p style="font-size: 11px; color: #6b7280; border-top: 1px solid #e5e7eb; padding-top: 12px; margin-top: 24px;"><a href="{{unsubscribeLink}}">Unsubscribe</a> from future communications</p>'
       }
     ]);
     setActiveStepTab(nextNum);
@@ -576,18 +576,25 @@ export default function BulkCampaignWizard({ initialCampaignId = null }: BulkCam
       return;
     }
 
-    let activeCid = campaignId;
-    if (!activeCid) {
-      const saved = await handleSaveDraft();
-      if (!saved || !saved.id) {
-        setTestSummaryMessage('Please fill campaign details and save draft before testing.');
-        return;
-      }
-      activeCid = saved.id;
+    const currentStep = activeStepObj || sequenceSteps[0];
+    const currentSubject = currentStep?.subject !== undefined ? currentStep.subject : (sequenceSteps[0]?.subject || '');
+    const currentBody = currentStep?.body !== undefined ? currentStep.body : (sequenceSteps[0]?.body || '');
+
+    if (!currentBody || currentBody === '<p><br></p>') {
+      alert('Email body cannot be empty before sending test email.');
+      return;
     }
 
+    // Always save current wizard progress (subject, body, list, schedule) to draft before dispatching test
+    const saved = await handleSaveDraft();
+    if (!saved) {
+      setTestSummaryMessage('Could not save campaign draft before testing. Please verify campaign details.');
+      return;
+    }
+    const activeCid = saved.id || campaignId;
+
     if (!activeCid) {
-      setTestSummaryMessage('Valid Campaign ID is required to dispatch test emails.');
+      setTestSummaryMessage('Please fill campaign details and save draft before testing.');
       return;
     }
 
@@ -603,7 +610,9 @@ export default function BulkCampaignWizard({ initialCampaignId = null }: BulkCam
           contactIds: selectedTestContactIds,
           testRecipients: manualTestEmails,
           sampleContactId: previewContactId || selectedTestContactIds[0] || undefined,
-          stepNumber: testEmailStepNumber
+          stepNumber: currentStep?.stepNumber || 1,
+          subject: currentSubject,
+          body: currentBody
         })
       });
 
@@ -1423,7 +1432,14 @@ export default function BulkCampaignWizard({ initialCampaignId = null }: BulkCam
                           ? <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                           : <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
                         }
-                        <div className="font-medium">{testSummaryMessage}</div>
+                        <div className="font-medium">
+                          {testSummaryMessage}
+                          {testResults && testResults.find(r => !r.success && r.error) && (
+                            <div className="text-[11px] opacity-90 mt-1 font-normal">
+                              Reason: {testResults.find(r => !r.success && r.error)?.error}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

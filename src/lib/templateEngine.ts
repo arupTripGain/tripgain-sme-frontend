@@ -155,7 +155,7 @@ export class TemplateEngine {
       let output = template(processedData);
 
       // Clean empty paragraphs like <p></p>, <p><br></p>, <p>&nbsp;</p> left behind by conditionals
-      output = output.replace(/<p>\s*(?:<br\s*\/?>|&nbsp;|\s)*<\/p>/gi, '');
+      output = output.replace(/<p[^>]*>\s*(?:<br\s*\/?>|&nbsp;|\s)*<\/p>/gi, '');
 
       // Clean up double spaces or punctuation spacing
       output = output.replace(/ {2,}/g, ' ');
@@ -166,6 +166,84 @@ export class TemplateEngine {
       // Strip any residual raw {{...}} tags that were unhandled
       if (!highlightVariables) {
         output = output.replace(/\{\{[^}]+\}\}/g, '');
+      }
+
+      // Unwrap any <p> tags directly inside <li> tags and ensure compact line spacing
+      output = output.replace(/<li([^>]*)>\s*<p[^>]*>([\s\S]*?)<\/p>\s*<\/li>/gi, '<li$1 style="margin-bottom:3px;line-height:1.45;">$2</li>');
+      output = output.replace(/<li(?![^>]*style=)([^>]*)>/gi, '<li$1 style="margin-bottom:3px;line-height:1.45;">');
+
+      // Convert consecutive bullet paragraphs (<p>• ...</p> or <p>- ...</p>) into compact <ul><li>
+      const bulletParaRegex = /(?:<p[^>]*>\s*(?:[•\u2022\u25E6\u2219]|-|\*)\s*[\s\S]*?<\/p>\s*)+/gi;
+      output = output.replace(bulletParaRegex, (match) => {
+        const itemRegex = /<p[^>]*>\s*(?:[•\u2022\u25E6\u2219]|-|\*)\s*([\s\S]*?)<\/p>/gi;
+        const items: string[] = [];
+        let m;
+        while ((m = itemRegex.exec(match)) !== null) {
+          if (m[1]) {
+            items.push(`<li style="margin-bottom:3px;line-height:1.45;">${m[1].trim()}</li>`);
+          }
+        }
+        return `<ul style="margin:8px 0 12px 0;padding-left:20px;list-style-type:disc;">${items.join('')}</ul>`;
+      });
+
+      // Convert consecutive numbered paragraphs (<p>1. ...</p> or <p>1) ...</p>) into compact <ol><li>
+      const numberedParaRegex = /(?:<p[^>]*>\s*\d+[\.\)]\s*[\s\S]*?<\/p>\s*)+/gi;
+      output = output.replace(numberedParaRegex, (match) => {
+        const itemRegex = /<p[^>]*>\s*\d+[\.\)]\s*([\s\S]*?)<\/p>/gi;
+        const items: string[] = [];
+        let m;
+        while ((m = itemRegex.exec(match)) !== null) {
+          if (m[1]) {
+            items.push(`<li style="margin-bottom:3px;line-height:1.45;">${m[1].trim()}</li>`);
+          }
+        }
+        return `<ol style="margin:8px 0 12px 0;padding-left:20px;list-style-type:decimal;">${items.join('')}</ol>`;
+      });
+
+      // Compact signature blocks: ensure sign-off, name, and company lines are contiguous with <br>
+      const signoffPattern = /<p[^>]*>\s*(?:(Best(?:[\s\u00A0]+regards)?|Warm(?:[\s\u00A0]+regards)?|Kind(?:[\s\u00A0]+regards)?|Regards|Thanks(?:[\s\u00A0]*(?:&|&amp;|and)[\s\u00A0]*regards)?|Thank[\s\u00A0]+you|Sincerely|Cheers|With[\s\u00A0]+regards|Yours[\s\u00A0]+truly|Talk[\s\u00A0]+soon|Many[\s\u00A0]+thanks)[,!.]?)\s*<\/p>/i;
+      const signoffMatch = signoffPattern.exec(output);
+      if (signoffMatch) {
+        const signoffIdx = signoffMatch.index;
+        const beforeSignoff = output.slice(0, signoffIdx);
+        const fromSignoff = output.slice(signoffIdx);
+
+        const pTagRegex = /^<p[^>]*>([\s\S]*?)<\/p>/i;
+        let remainder = fromSignoff;
+        const signatureLines: string[] = [];
+
+        while (true) {
+          const pMatch = pTagRegex.exec(remainder);
+          if (!pMatch || !pMatch[1]) break;
+          const content = pMatch[1].trim();
+          const textOnly = content.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+
+          // Skip blank empty paragraphs in signature section
+          if (!textOnly) {
+            remainder = remainder.slice(pMatch[0].length).trim();
+            continue;
+          }
+
+          if (
+            signatureLines.length > 0 &&
+            (textOnly.length > 80 ||
+              /unsubscribe/i.test(content) ||
+              /<(?:blockquote|table|ul|ol|h[1-6]|hr|div)/i.test(content))
+          ) {
+            break;
+          }
+          signatureLines.push(content);
+          remainder = remainder.slice(pMatch[0].length).trim();
+          if (signatureLines.length >= 6) break;
+        }
+
+        if (signatureLines.length > 1) {
+          const flattened = signatureLines.flatMap(line =>
+            line.split(/<br\s*\/?>/i).map(l => l.trim()).filter(Boolean)
+          );
+          const compactSignature = `<p class="email-signature" style="margin-bottom:0;line-height:1.4;">${flattened.join('<br>')}</p>`;
+          output = beforeSignoff + compactSignature + (remainder ? (remainder.startsWith('<') ? remainder : ' ' + remainder) : '');
+        }
       }
 
       return output.trim();

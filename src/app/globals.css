@@ -131,13 +131,33 @@
 .email-preview-content ul {
   list-style-type: disc;
   padding-left: 1.25rem;
-  margin-bottom: 1rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0.75rem;
 }
 .email-rendered-body ol,
 .email-preview-content ol {
   list-style-type: decimal;
   padding-left: 1.25rem;
-  margin-bottom: 1rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+.email-rendered-body li,
+.email-preview-content li,
+.ql-editor li {
+  margin-top: 0;
+  margin-bottom: 0.25rem;
+  line-height: 1.45;
+}
+.email-rendered-body li:last-child,
+.email-preview-content li:last-child,
+.ql-editor li:last-child {
+  margin-bottom: 0;
+}
+.email-rendered-body li p,
+.email-preview-content li p,
+.ql-editor li p {
+  margin: 0 !important;
+  display: inline;
 }
 .email-rendered-body blockquote,
 .email-preview-content blockquote {
@@ -150,4 +170,10 @@
 .email-preview-content a {
   color: #2563eb;
   text-decoration: underline;
+}
+.email-rendered-body .email-signature,
+.email-preview-content .email-signature {
+  margin-top: 0.75rem;
+  margin-bottom: 0 !important;
+  line-height: 1.4 !important;
 }

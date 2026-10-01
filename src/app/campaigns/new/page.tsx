@@ -133,6 +133,28 @@ export default function CampaignComposerPage() {
   const [mailboxDropdownOpen, setMailboxDropdownOpen] = useState(false);
   const [mailboxSearch, setMailboxSearch] = useState('');
 
+  // Test Email State for Preview Modal
+  const [selectedTestMailbox, setSelectedTestMailbox] = useState<string>('');
+  const [testRecipients, setTestRecipients] = useState<string[]>([]);
+  const [newRecipientInput, setNewRecipientInput] = useState<string>('');
+  const [sendingTestEmail, setSendingTestEmail] = useState<boolean>(false);
+  const [testEmailFeedback, setTestEmailFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [deliverabilityScore, setDeliverabilityScore] = useState<{ score: number; label: string; tips: string[] } | null>(null);
+
+  useEffect(() => {
+    if (previewStep !== null) {
+      setTestEmailFeedback(null);
+      setDeliverabilityScore(null);
+      if (previewLead?.email && (!testRecipients.length || !testRecipients.includes(previewLead.email))) {
+        setTestRecipients([previewLead.email]);
+      }
+      if (!selectedTestMailbox) {
+        const defaultSender = settings.senderMailboxes?.[0] || availableMailboxes.find((m: any) => m.status === 'CONNECTED')?.email || '';
+        if (defaultSender) setSelectedTestMailbox(defaultSender);
+      }
+    }
+  }, [previewStep, previewLead?.email]);
+
   useEffect(() => {
     apiFetch('/api/lists')
       .then(res => res.json())
@@ -311,16 +333,120 @@ export default function CampaignComposerPage() {
     return (
       <div 
         className="email-preview-content text-sm leading-relaxed text-secondary
-          [&_p]:mb-4 [&_p:last-child]:mb-0
+          [&_p]:mb-3 [&_p:last-child]:mb-0
           [&_p:empty]:hidden
           [&_p>br:only-child]:inline-block [&_p>br:only-child]:h-3
-          [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-4
-          [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-4
+          [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2
+          [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2
+          [&_li]:mb-1 [&_li:last-child]:mb-0 [&_li]:leading-normal
+          [&_li_p]:m-0 [&_li_p]:inline
           [&_blockquote]:border-l-4 [&_blockquote]:border-border [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-3
           [&_a]:text-blue-600 [&_a]:underline"
         dangerouslySetInnerHTML={{ __html: html }} 
       />
     );
+  };
+
+  const handleSendTestEmail = async () => {
+    const recipientsToSend = [...testRecipients];
+    const trimmedInput = newRecipientInput.trim().toLowerCase();
+    if (trimmedInput && trimmedInput.includes('@') && !recipientsToSend.includes(trimmedInput)) {
+      recipientsToSend.push(trimmedInput);
+    }
+
+    if (recipientsToSend.length === 0) {
+      setTestEmailFeedback({ type: 'error', message: 'Please specify at least one recipient email address.' });
+      return;
+    }
+
+    const stepData = sequenceSteps.find(s => s.id === previewStep) || sequenceSteps[0];
+    if (!stepData) {
+      setTestEmailFeedback({ type: 'error', message: 'No sequence step selected to test.' });
+      return;
+    }
+
+    const sender = selectedTestMailbox || settings.senderMailboxes?.[0] || availableMailboxes.find(m => m.status === 'CONNECTED')?.email || '';
+    if (!sender) {
+      setTestEmailFeedback({ type: 'error', message: 'No sender mailbox available. Please select or connect a mailbox in settings.' });
+      return;
+    }
+
+    setSendingTestEmail(true);
+    setTestEmailFeedback(null);
+
+    try {
+      const res = await apiFetch('/api/campaigns/test-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderMailbox: sender,
+          testRecipients: recipientsToSend,
+          subject: stepData.subject || 'Test Email',
+          body: stepData.body || '<p>Test email body</p>',
+          stepId: stepData.id,
+          leadData: previewLead
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setTestEmailFeedback({
+          type: 'success',
+          message: data.message || `Test email dispatched successfully to ${recipientsToSend.join(', ')} via ${sender}`
+        });
+      } else {
+        setTestEmailFeedback({
+          type: 'error',
+          message: data.error || data.message || 'Failed to send test email. Please check your mailbox connection.'
+        });
+      }
+    } catch (err: any) {
+      console.error(err);
+      setTestEmailFeedback({
+        type: 'error',
+        message: err.message || 'Error communicating with server while sending test email'
+      });
+    } finally {
+      setSendingTestEmail(false);
+    }
+  };
+
+  const handleCheckDeliverability = () => {
+    const stepData = sequenceSteps.find(s => s.id === previewStep) || sequenceSteps[0];
+    const subjectText = stepData?.subject || '';
+    const bodyText = (stepData?.body || '').replace(/<[^>]*>/g, '');
+
+    const spamWords = ['free', 'guarantee', 'urgent', 'winner', 'risk-free', 'buy now', '100% free', 'act now', 'cash', 'earn $$$', 'special promotion'];
+    const foundSpamWords = spamWords.filter(word => 
+      subjectText.toLowerCase().includes(word) || bodyText.toLowerCase().includes(word)
+    );
+
+    let score = 95;
+    const tips: string[] = [];
+
+    if (!subjectText) {
+      score -= 25;
+      tips.push('Subject line is missing.');
+    } else if (subjectText.length > 60) {
+      score -= 10;
+      tips.push('Subject line is longer than 60 characters.');
+    } else if (subjectText.length < 15) {
+      score -= 5;
+      tips.push('Subject line is very short; consider adding more context.');
+    }
+
+    if (foundSpamWords.length > 0) {
+      score -= foundSpamWords.length * 10;
+      tips.push(`Contains spam-trigger phrase(s): ${foundSpamWords.join(', ')}`);
+    }
+
+    if (!bodyText || bodyText.length < 50) {
+      score -= 20;
+      tips.push('Email body is too brief for cold outreach.');
+    }
+
+    const label = score >= 85 ? 'Excellent' : score >= 70 ? 'Good' : 'Needs Attention';
+    setDeliverabilityScore({ score: Math.max(score, 20), label, tips });
   };
 
   const [savingDraft, setSavingDraft] = useState(false);
@@ -1345,10 +1471,22 @@ export default function CampaignComposerPage() {
               <div className="space-y-5 mb-8">
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-muted-foreground tracking-wider">Send from:</label>
-                  <select className="w-full h-10 px-3 rounded-md border border-input focus:ring-1 focus:ring-primary outline-none text-sm bg-background">
-                    {settings.senderMailboxes?.map((email, idx) => (
-                      <option key={idx} value={email}>{email}</option>
-                    ))}
+                  <select 
+                    className="w-full h-10 px-3 rounded-md border border-input focus:ring-1 focus:ring-primary outline-none text-sm bg-background text-secondary"
+                    value={selectedTestMailbox || settings.senderMailboxes?.[0] || ''}
+                    onChange={(e) => setSelectedTestMailbox(e.target.value)}
+                  >
+                    {availableMailboxes.length > 0 ? (
+                      availableMailboxes.map((m: any) => (
+                        <option key={m.id} value={m.email}>
+                          {m.email} {m.displayName ? `(${m.displayName})` : ''}
+                        </option>
+                      ))
+                    ) : (
+                      (settings.senderMailboxes?.length ? settings.senderMailboxes : ['arup.nirala@tripgainconnect.com']).map((email, idx) => (
+                        <option key={idx} value={email}>{email}</option>
+                      ))
+                    )}
                   </select>
                 </div>
                 <div className="space-y-1.5">
@@ -1359,7 +1497,11 @@ export default function CampaignComposerPage() {
                     onChange={(e) => {
                       const c = contacts.find(contact => contact.id === e.target.value);
                       if (c) {
-                        setPreviewLead(buildCanonicalLeadContext(c, 'Arup', 'TripGain'));
+                        const newLead = buildCanonicalLeadContext(c, 'Arup', 'TripGain');
+                        setPreviewLead(newLead);
+                        if (newLead.email) {
+                          setTestRecipients([newLead.email]);
+                        }
                       }
                     }}
                   >
@@ -1418,14 +1560,54 @@ export default function CampaignComposerPage() {
 
                 {/* Header */}
                 <div className="space-y-5 max-w-3xl">
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm font-medium text-muted-foreground w-16">Send to:</span>
-                    <div className="flex items-center gap-2 flex-1">
-                      <span className="px-3 py-1.5 bg-muted border border-border rounded-full text-sm font-medium text-secondary flex items-center gap-2">
-                        {previewLead.email}
-                        <button className="text-muted-foreground hover:text-red-500"><X className="w-3.5 h-3.5" /></button>
-                      </span>
-                      <input type="text" placeholder="Enter email address" className="flex-1 text-sm bg-transparent border-none outline-none" />
+                  <div className="flex items-start gap-4">
+                    <span className="text-sm font-medium text-muted-foreground w-16 pt-2">Send to:</span>
+                    <div className="flex items-center gap-2 flex-1 flex-wrap p-2 border border-input rounded-lg bg-background min-h-[44px] focus-within:ring-1 focus-within:ring-primary">
+                      {testRecipients.map((email, idx) => (
+                        <span key={idx} className="px-3 py-1 bg-muted border border-border rounded-full text-xs font-medium text-secondary flex items-center gap-1.5 shadow-2xs">
+                          {email}
+                          <button 
+                            type="button"
+                            onClick={() => setTestRecipients(prev => prev.filter((_, i) => i !== idx))}
+                            className="text-muted-foreground hover:text-red-500 transition-colors"
+                            title="Remove recipient"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </span>
+                      ))}
+                      <input 
+                        type="email" 
+                        placeholder={testRecipients.length === 0 ? "Enter email address and press Enter" : "Add another email..."} 
+                        value={newRecipientInput}
+                        onChange={(e) => setNewRecipientInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ',') {
+                            e.preventDefault();
+                            const trimmed = newRecipientInput.trim().toLowerCase();
+                            if (trimmed && trimmed.includes('@') && !testRecipients.includes(trimmed)) {
+                              setTestRecipients(prev => [...prev, trimmed]);
+                              setNewRecipientInput('');
+                            }
+                          }
+                        }}
+                        className="flex-1 text-sm bg-transparent border-none outline-none min-w-[150px] px-2 py-1 text-secondary" 
+                      />
+                      {newRecipientInput.trim().includes('@') && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const trimmed = newRecipientInput.trim().toLowerCase();
+                            if (trimmed && !testRecipients.includes(trimmed)) {
+                              setTestRecipients(prev => [...prev, trimmed]);
+                              setNewRecipientInput('');
+                            }
+                          }}
+                          className="px-2.5 py-1 bg-primary text-primary-foreground text-xs font-semibold rounded hover:bg-primary/90 transition-colors cursor-pointer"
+                        >
+                          Add
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
@@ -1451,11 +1633,65 @@ export default function CampaignComposerPage() {
                 </div>
               </div>
 
-              <div className="p-6 border-t border-border bg-card flex justify-end gap-4 items-center">
-                <button className="px-5 py-2.5 rounded-md border border-blue-600 text-blue-600 text-sm font-semibold hover:bg-blue-50 transition-colors">Check Deliverability Score</button>
-                <button className="px-6 py-2.5 rounded-md bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20 flex items-center gap-2">
-                  <Play className="w-4 h-4 fill-current rotate-90" /> Send test email
-                </button>
+              <div className="p-6 border-t border-border bg-card flex flex-col gap-4">
+                {testEmailFeedback && (
+                  <div className={`p-3 rounded-lg text-xs flex items-start gap-2.5 border animate-in fade-in duration-200 ${
+                    testEmailFeedback.type === 'success' 
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                      : 'bg-red-50 text-red-800 border-red-200'
+                  }`}>
+                    {testEmailFeedback.type === 'success' ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                    )}
+                    <div className="font-medium">{testEmailFeedback.message}</div>
+                  </div>
+                )}
+
+                {deliverabilityScore && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 space-y-1 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between font-bold">
+                      <span>Deliverability Score: {deliverabilityScore.score}/100 ({deliverabilityScore.label})</span>
+                      <span className="text-[10px] font-normal uppercase tracking-wider text-blue-700">Pre-flight spam check</span>
+                    </div>
+                    {deliverabilityScore.tips.length > 0 && (
+                      <ul className="list-disc pl-4 text-blue-800 space-y-0.5 mt-1">
+                        {deliverabilityScore.tips.map((tip, i) => (
+                          <li key={i}>{tip}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-4 items-center">
+                  <button 
+                    type="button"
+                    onClick={handleCheckDeliverability}
+                    className="px-5 py-2.5 rounded-md border border-blue-600 text-blue-600 text-sm font-semibold hover:bg-blue-50 transition-colors cursor-pointer"
+                  >
+                    Check Deliverability Score
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={handleSendTestEmail}
+                    disabled={sendingTestEmail || (testRecipients.length === 0 && !newRecipientInput.trim())}
+                    className="px-6 py-2.5 rounded-md bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20 flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                  >
+                    {sendingTestEmail ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        Sending test email...
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-4 h-4 fill-current rotate-90" />
+                        Send test email
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

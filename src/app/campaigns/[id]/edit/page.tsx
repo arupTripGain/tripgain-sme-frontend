@@ -394,11 +394,13 @@ function CampaignEditWizard() {
     return (
       <div 
         className="email-preview-content text-sm leading-relaxed text-secondary
-          [&_p]:mb-4 [&_p:last-child]:mb-0
+          [&_p]:mb-3 [&_p:last-child]:mb-0
           [&_p:empty]:hidden
           [&_p>br:only-child]:inline-block [&_p>br:only-child]:h-3
-          [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-4
-          [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-4
+          [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2
+          [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2
+          [&_li]:mb-1 [&_li:last-child]:mb-0 [&_li]:leading-normal
+          [&_li_p]:m-0 [&_li_p]:inline
           [&_blockquote]:border-l-4 [&_blockquote]:border-border [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-3
           [&_a]:text-blue-600 [&_a]:underline"
         dangerouslySetInnerHTML={{ __html: html }} 

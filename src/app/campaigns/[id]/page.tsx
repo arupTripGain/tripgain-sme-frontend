@@ -210,8 +210,10 @@ export default function CampaignDashboardPage() {
       <div 
         className="email-preview-content text-sm leading-relaxed text-secondary
           [&_p]:mb-3 [&_p:last-child]:mb-0
-          [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3
-          [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-3
+          [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2
+          [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2
+          [&_li]:mb-1 [&_li:last-child]:mb-0 [&_li]:leading-normal
+          [&_li_p]:m-0 [&_li_p]:inline
           [&_a]:text-blue-600 [&_a]:underline"
         dangerouslySetInnerHTML={{ __html: clean }} 
       />
