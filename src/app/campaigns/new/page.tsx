@@ -381,8 +381,8 @@ export default function CampaignComposerPage() {
         body: JSON.stringify({
           senderMailbox: sender,
           testRecipients: recipientsToSend,
-          subject: stepData.subject || 'Test Email',
-          body: stepData.body || '<p>Test email body</p>',
+          subject: TemplateEngine.htmlToHandlebars(stepData.subject || 'Test Email'),
+          body: TemplateEngine.htmlToHandlebars(stepData.body || '<p>Test email body</p>'),
           stepId: stepData.id,
           leadData: previewLead
         })
@@ -1488,6 +1488,77 @@ export default function CampaignComposerPage() {
                       ))
                     )}
                   </select>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-muted-foreground tracking-wider">Send test to:</label>
+                    {previewLead.email && !testRecipients.includes(previewLead.email) && (
+                      <button 
+                        type="button"
+                        onClick={() => setTestRecipients(prev => [...prev, previewLead.email])}
+                        className="text-[11px] text-blue-600 hover:underline font-semibold cursor-pointer"
+                        title="Add current lead email to recipients"
+                      >
+                        + Use Lead Email
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex gap-1.5">
+                      <input 
+                        type="email"
+                        placeholder="Enter email address..."
+                        value={newRecipientInput}
+                        onChange={(e) => setNewRecipientInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ',') {
+                            e.preventDefault();
+                            const trimmed = newRecipientInput.trim().toLowerCase();
+                            if (trimmed && trimmed.includes('@') && !testRecipients.includes(trimmed)) {
+                              setTestRecipients(prev => [...prev, trimmed]);
+                              setNewRecipientInput('');
+                            }
+                          }
+                        }}
+                        className="flex-1 h-9 px-2.5 rounded-md border border-input focus:ring-1 focus:ring-primary outline-none text-xs bg-background text-secondary"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const trimmed = newRecipientInput.trim().toLowerCase();
+                          if (trimmed && trimmed.includes('@') && !testRecipients.includes(trimmed)) {
+                            setTestRecipients(prev => [...prev, trimmed]);
+                            setNewRecipientInput('');
+                          }
+                        }}
+                        disabled={!newRecipientInput.trim() || !newRecipientInput.includes('@')}
+                        className="px-3 h-9 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-semibold disabled:opacity-40 cursor-pointer shrink-0"
+                      >
+                        Add
+                      </button>
+                    </div>
+
+                    {testRecipients.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pt-0.5">
+                        {testRecipients.map((email, idx) => (
+                          <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-1 bg-background border border-border rounded-full text-xs font-medium text-secondary shadow-2xs">
+                            <span className="truncate max-w-[170px]">{email}</span>
+                            <button
+                              type="button"
+                              onClick={() => setTestRecipients(prev => prev.filter((_, i) => i !== idx))}
+                              className="text-muted-foreground hover:text-red-500 transition-colors"
+                              title="Remove"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-amber-600 font-medium">Add an email address above to receive the test email.</p>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-muted-foreground tracking-wider">Load data for lead:</label>

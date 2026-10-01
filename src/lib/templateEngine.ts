@@ -48,15 +48,16 @@ export class TemplateEngine {
 
     // Step 1: Normalize non-breaking spaces across the whole document
     text = text
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&#160;/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&#160;/gi, ' ')
       .replace(/&#xA0;/gi, ' ')
       .replace(/\u00A0/g, ' ');
 
-    // Step 2: Clean inside {{ ... }} blocks: strip any accidental HTML formatting tags inside handlebars tags
-    text = text.replace(/\{\{([^{}]+)\}\}/g, (match, inner) => {
+    // Step 2: Clean inside {{ ... }} blocks: strip rogue HTML formatting tags and normalize whitespace
+    text = text.replace(/\{\{([^{}]+)\}\}/g, (_match, inner) => {
       // Strip any HTML tags that might have leaked into the variable tag itself (e.g. {{<strong>var</strong>}})
-      const cleanedInner = inner.replace(/<[^>]+>/g, '').trim();
+      let cleanedInner = inner.replace(/<[^>]+>/g, '').trim();
+      cleanedInner = cleanedInner.replace(/&nbsp;/gi, ' ').replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
       return `{{${cleanedInner}}}`;
     });
 
@@ -248,10 +249,35 @@ export class TemplateEngine {
 
       return output.trim();
     } catch (e: any) {
-      // If Handlebars parsing fails, return the raw template or error msg
-      return highlightVariables 
-        ? `<span class="text-red-600 font-bold">Template Syntax Error: ${e.message}</span>`
-        : plainTemplate;
+      if (highlightVariables) {
+        return `<span class="text-red-600 font-bold">Template Syntax Warning: ${e.message}</span>`;
+      }
+      // Resilient fallback: resolve simple {{#if key}} and {{key}} tokens via regex
+      try {
+        let fallbackText = plainTemplate;
+        fallbackText = fallbackText.replace(
+          /\{\{#if\s+([a-zA-Z0-9_]+)\}\}([\s\S]*?)\{\{else\}\}([\s\S]*?)\{\{\/if\}\}/gi,
+          (_, key, truthy, falsy) => {
+            const val = data[key];
+            return val && String(val).trim() !== '' ? truthy : falsy;
+          }
+        );
+        fallbackText = fallbackText.replace(
+          /\{\{#if\s+([a-zA-Z0-9_]+)\}\}([\s\S]*?)\{\{\/if\}\}/gi,
+          (_, key, content) => {
+            const val = data[key];
+            return val && String(val).trim() !== '' ? content : '';
+          }
+        );
+        fallbackText = fallbackText.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => {
+          const val = data[key];
+          return val !== undefined && val !== null ? String(val) : '';
+        });
+        fallbackText = fallbackText.replace(/\{\{[^}]+\}\}/g, '');
+        return fallbackText.trim();
+      } catch {
+        return plainTemplate;
+      }
     }
   }
 
