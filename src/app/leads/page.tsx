@@ -7,8 +7,9 @@ import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { 
   Search, Plus, Filter, MoreHorizontal, FileDown, Upload, Users, Building2, Trash2,
-  Sparkles, CheckCircle2, AlertTriangle, RefreshCw, Eye, X, Clock, AlertCircle, ShieldCheck, ChevronDown
+  Sparkles, CheckCircle2, AlertTriangle, RefreshCw, Eye, X, Clock, AlertCircle, ShieldCheck, ChevronDown, ShieldAlert
 } from 'lucide-react';
+import AddSuppressionModal from '@/components/AddSuppressionModal';
 
 export default function LeadsPage() {
   const router = useRouter();
@@ -35,6 +36,10 @@ export default function LeadsPage() {
   // Selection & Menus
   const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+  // Suppression Modal state
+  const [suppressionModalOpen, setSuppressionModalOpen] = useState(false);
+  const [suppressTargetEmail, setSuppressTargetEmail] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -402,17 +407,9 @@ export default function LeadsPage() {
     }
   };
 
-  const handleAddToSuppression = async (contactId: string) => {
-    try {
-      const res = await apiFetch(`/api/lists/suppression-1/members`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contactIds: [contactId] })
-      });
-      if (res.ok) alert('Added to suppression list');
-    } catch (e) {
-      console.error(e);
-    }
+  const handleAddToSuppression = (email: string) => {
+    setSuppressTargetEmail(email || '');
+    setSuppressionModalOpen(true);
   };
 
   const handleExport = async (contactIds: string[]) => {
@@ -454,6 +451,17 @@ export default function LeadsPage() {
           </div>
           
           <div className="flex items-center gap-3">
+            <button 
+              type="button"
+              onClick={() => {
+                setSuppressTargetEmail('');
+                setSuppressionModalOpen(true);
+              }}
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-border bg-card hover:bg-accent h-10 px-3.5 gap-2 shadow-sm text-secondary transition-colors"
+            >
+              <ShieldAlert className="h-4 w-4 text-amber-600" />
+              Suppression
+            </button>
             <Link 
               href="/leads/import"
               className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-border bg-card hover:bg-accent h-10 px-4 gap-2 shadow-sm text-secondary transition-colors"
@@ -608,6 +616,15 @@ export default function LeadsPage() {
                   <button onClick={() => openAddToListModal(Array.from(selectedContacts))} className="px-3 py-1.5 text-sm font-medium hover:bg-white/10 rounded transition-colors">Add to List</button>
                   <button onClick={() => openAddToCampaignModal(Array.from(selectedContacts))} className="px-3 py-1.5 text-sm font-medium hover:bg-white/10 rounded transition-colors">Campaign</button>
                   <button onClick={() => handleExport(Array.from(selectedContacts))} className="px-3 py-1.5 text-sm font-medium hover:bg-white/10 rounded transition-colors">Export</button>
+                  <button 
+                    onClick={() => {
+                      const emails = contacts.filter(c => selectedContacts.has(c.id)).map(c => c.email).filter(Boolean).join('\n');
+                      handleAddToSuppression(emails);
+                    }} 
+                    className="px-3 py-1.5 text-sm font-medium hover:bg-white/10 rounded transition-colors flex items-center gap-1.5 text-amber-200"
+                  >
+                    <ShieldAlert className="w-3.5 h-3.5" /> Suppress ({selectedContacts.size})
+                  </button>
                   <div className="w-px h-4 bg-white/20 mx-1"></div>
                   <button onClick={handleBulkDelete} className="px-3 py-1.5 text-sm font-medium text-red-300 hover:bg-white/10 hover:text-red-200 rounded transition-colors flex items-center gap-1.5">
                     <Trash2 className="w-4 h-4" /> Delete
@@ -758,7 +775,10 @@ export default function LeadsPage() {
                                 <button onClick={() => router.push(`/leads/${contact.id}`)} className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left">View Activity</button>
                                 <div className="h-px bg-border my-1"></div>
                                 <button onClick={() => { setActiveMenuId(null); handleMarkDoNotContact(contact.id); }} className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left">Mark Do Not Contact</button>
-                                <button onClick={() => { setActiveMenuId(null); handleAddToSuppression(contact.id); }} className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left">Add to Suppression</button>
+                                <button onClick={() => { setActiveMenuId(null); handleAddToSuppression(contact.email); }} className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left flex items-center gap-1.5">
+                                  <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
+                                  Add to Suppression
+                                </button>
                                 <div className="h-px bg-border my-1"></div>
                                 <button onClick={() => { setActiveMenuId(null); handleDeleteContact(contact.id, contact.fullName || contact.email); }} className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 text-left font-medium">Delete Lead</button>
                               </div>
@@ -1161,6 +1181,17 @@ export default function LeadsPage() {
           </div>
         </div>
       )}
+
+      {/* Add to Suppression Modal */}
+      <AddSuppressionModal
+        isOpen={suppressionModalOpen}
+        onClose={() => {
+          setSuppressionModalOpen(false);
+          setSuppressTargetEmail('');
+        }}
+        defaultEmail={suppressTargetEmail}
+        onSuccess={() => fetchData()}
+      />
     </div>
   );
 }

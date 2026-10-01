@@ -33,6 +33,7 @@ import {
   Coins,
   Clock
 } from 'lucide-react';
+import AddSuppressionModal from '@/components/AddSuppressionModal';
 
 const TABS = [
   { id: 'general', label: 'General', icon: SettingsIcon },
@@ -535,18 +536,116 @@ function TrackingSettings() {
 }
 
 function SuppressionSettings() {
+  const [suppressions, setSuppressions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+
+  const fetchSuppressions = async (query = '') => {
+    setLoading(true);
+    try {
+      const url = query ? `/api/suppression?search=${encodeURIComponent(query)}` : '/api/suppression';
+      const res = await apiFetch(url);
+      const data = await res.json();
+      if (res.ok && data.suppressions) {
+        setSuppressions(data.suppressions);
+        setTotalCount(data.total || data.suppressions.length);
+      }
+    } catch (err) {
+      console.error('Failed to fetch suppressions:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSuppressions(search);
+  }, []);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSearch(val);
+    fetchSuppressions(val);
+  };
+
+  const handleRemove = async (id: string, email: string) => {
+    if (!confirm(`Are you sure you want to remove ${email} from the suppression list?\n\nThey may become eligible for future outreach campaigns.`)) {
+      return;
+    }
+    try {
+      const res = await apiFetch(`/api/suppression/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setSuppressions(prev => prev.filter(s => s.id !== id));
+        setTotalCount(prev => Math.max(0, prev - 1));
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to remove suppression');
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Error removing suppression');
+    }
+  };
+
+  const handleExport = () => {
+    if (!suppressions.length) {
+      alert('No suppressed emails to export.');
+      return;
+    }
+    const header = 'Email,Reason,Source,Suppressed At,Notes\n';
+    const rows = suppressions.map(s => 
+      `"${s.email}","${s.reason}","${s.source || ''}","${new Date(s.suppressedAt).toISOString()}","${(s.notes || '').replace(/"/g, '""')}"`
+    ).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `suppression_list_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const formatReason = (reason: string) => {
+    switch ((reason || '').toLowerCase()) {
+      case 'unsubscribe':
+      case 'unsubscribed':
+        return <span className="bg-gray-100 text-gray-800 px-2 py-0.5 rounded text-xs font-medium">Unsubscribed</span>;
+      case 'hard_bounce':
+      case 'bounce':
+        return <span className="bg-red-50 text-red-700 px-2 py-0.5 rounded text-xs font-medium">Hard Bounce</span>;
+      case 'spam_complaint':
+        return <span className="bg-rose-100 text-rose-800 px-2 py-0.5 rounded text-xs font-medium">Spam Complaint</span>;
+      case 'do_not_contact':
+      default:
+        return <span className="bg-orange-50 text-orange-700 px-2 py-0.5 rounded text-xs font-medium">Do Not Contact</span>;
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold" style={{ color: '#14385F' }}>Suppression List</h2>
-          <p className="text-sm mt-1 text-gray-600">Manage contacts who must never receive outreach.</p>
+          <p className="text-sm mt-1 text-gray-600">
+            Manage contacts who must never receive outreach ({totalCount} suppressed).
+          </p>
         </div>
         <div className="flex gap-2">
-          <button className="px-4 py-2 rounded-md text-sm font-bold border transition-colors hover:bg-gray-50" style={{ borderColor: '#E0C0B2', color: '#14385F' }}>
-            Export
+          <button 
+            onClick={handleExport}
+            disabled={!suppressions.length}
+            className="px-4 py-2 rounded-md text-sm font-bold border transition-colors hover:bg-gray-50 disabled:opacity-50" 
+            style={{ borderColor: '#E0C0B2', color: '#14385F' }}
+          >
+            Export CSV
           </button>
-          <button className="px-4 py-2 rounded-md text-sm font-bold text-white transition-opacity hover:opacity-90" style={{ backgroundColor: '#F16F21' }}>
+          <button 
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-4 py-2 rounded-md text-sm font-bold text-white transition-opacity hover:opacity-90 flex items-center gap-1.5 shadow-sm" 
+            style={{ backgroundColor: '#F16F21' }}
+          >
+            <ShieldAlert className="w-4 h-4" />
             Add to Suppression
           </button>
         </div>
@@ -555,43 +654,85 @@ function SuppressionSettings() {
       <div className="bg-orange-50 border border-orange-200 text-orange-800 text-sm p-4 rounded-lg flex items-start gap-3">
         <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5 text-orange-600" />
         <div>
-          <strong className="block mb-1">Important System Rule</strong>
-          The suppression list is checked before <strong>every</strong> email send, regardless of individual campaign settings. Contacts here are completely blocked.
+          <strong className="block mb-1">Guaranteed Blocking System</strong>
+          The suppression list is strictly checked before <strong>every single email send</strong> across both Standard and Bulk campaigns. Anyone on this list is completely blocked from receiving emails.
         </div>
       </div>
 
-      <div className="border border-gray-200 rounded-lg overflow-hidden">
+      {/* Search Input */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="relative flex-1 max-w-sm">
+          <input
+            type="text"
+            placeholder="Search email or reason..."
+            value={search}
+            onChange={handleSearchChange}
+            className="w-full h-9 pl-9 pr-3 rounded-lg border border-gray-200 text-xs focus:ring-2 focus:ring-[#F16F21] outline-none"
+          />
+          <ShieldAlert className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        </div>
+      </div>
+
+      <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-2xs">
         <table className="w-full text-sm text-left">
           <thead className="bg-gray-50 border-b border-gray-200 text-gray-600">
             <tr>
               <th className="px-4 py-3 font-semibold">Email</th>
               <th className="px-4 py-3 font-semibold">Reason</th>
-              <th className="px-4 py-3 font-semibold">Date</th>
+              <th className="px-4 py-3 font-semibold">Date Added</th>
+              <th className="px-4 py-3 font-semibold">Notes</th>
               <th className="px-4 py-3 text-right font-semibold">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 bg-white">
-            <tr>
-              <td className="px-4 py-3 font-medium">john@abc.com</td>
-              <td className="px-4 py-3 text-gray-600"><span className="bg-gray-100 px-2 py-0.5 rounded text-xs">Unsubscribed</span></td>
-              <td className="px-4 py-3 text-gray-500">Sep 2</td>
-              <td className="px-4 py-3 text-right"><button className="text-red-600 hover:underline text-xs font-medium">Remove</button></td>
-            </tr>
-            <tr>
-              <td className="px-4 py-3 font-medium">rahul@xyz.com</td>
-              <td className="px-4 py-3 text-gray-600"><span className="bg-red-50 text-red-700 px-2 py-0.5 rounded text-xs">Hard Bounce</span></td>
-              <td className="px-4 py-3 text-gray-500">Sep 1</td>
-              <td className="px-4 py-3 text-right"><button className="text-red-600 hover:underline text-xs font-medium">Remove</button></td>
-            </tr>
-            <tr>
-              <td className="px-4 py-3 font-medium">amit@test.com</td>
-              <td className="px-4 py-3 text-gray-600"><span className="bg-orange-50 text-orange-700 px-2 py-0.5 rounded text-xs">Do Not Contact</span></td>
-              <td className="px-4 py-3 text-gray-500">Aug 29</td>
-              <td className="px-4 py-3 text-right"><button className="text-red-600 hover:underline text-xs font-medium">Remove</button></td>
-            </tr>
+            {loading ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-xs text-gray-500">
+                  <RefreshCw className="w-4 h-4 animate-spin inline mr-2 text-[#F16F21]" />
+                  Loading suppression list...
+                </td>
+              </tr>
+            ) : suppressions.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-12 text-center text-gray-400 text-xs">
+                  {search ? 'No suppressed emails match your search query.' : 'No suppressed emails found. Click "Add to Suppression" to block contacts.'}
+                </td>
+              </tr>
+            ) : (
+              suppressions.map((item) => (
+                <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                  <td className="px-4 py-3 font-medium text-gray-900 font-mono text-xs">{item.email}</td>
+                  <td className="px-4 py-3">{formatReason(item.reason)}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">
+                    {new Date(item.suppressedAt).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 text-xs max-w-xs truncate">
+                    {item.notes || '—'}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button 
+                      onClick={() => handleRemove(item.id, item.email)}
+                      className="text-red-600 hover:text-red-800 hover:underline text-xs font-medium cursor-pointer"
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
+
+      <AddSuppressionModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onSuccess={() => fetchSuppressions(search)}
+      />
     </div>
   );
 }
