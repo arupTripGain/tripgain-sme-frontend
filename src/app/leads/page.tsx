@@ -10,6 +10,7 @@ import {
   Sparkles, CheckCircle2, AlertTriangle, RefreshCw, Eye, X, Clock, AlertCircle, ShieldCheck, ChevronDown, ShieldAlert
 } from 'lucide-react';
 import AddSuppressionModal from '@/components/AddSuppressionModal';
+import SmartAddLeadModal from '@/components/SmartAddLeadModal';
 
 export default function LeadsPage() {
   const router = useRouter();
@@ -40,6 +41,9 @@ export default function LeadsPage() {
   // Suppression Modal state
   const [suppressionModalOpen, setSuppressionModalOpen] = useState(false);
   const [suppressTargetEmail, setSuppressTargetEmail] = useState('');
+
+  // Smart Add Lead Modal state
+  const [smartAddModalOpen, setSmartAddModalOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -461,6 +465,14 @@ export default function LeadsPage() {
             >
               <ShieldAlert className="h-4 w-4 text-amber-600" />
               Suppression
+            </button>
+            <button 
+              type="button"
+              onClick={() => setSmartAddModalOpen(true)}
+              className="inline-flex items-center justify-center rounded-md text-sm font-semibold border border-orange-200 bg-orange-50/80 hover:bg-orange-100 text-[#F16F21] h-10 px-3.5 gap-2 shadow-xs transition-colors cursor-pointer"
+            >
+              <Sparkles className="h-4 w-4 text-[#F16F21]" />
+              Smart Add Lead
             </button>
             <Link 
               href="/leads/import"
@@ -1190,6 +1202,13 @@ export default function LeadsPage() {
           setSuppressTargetEmail('');
         }}
         defaultEmail={suppressTargetEmail}
+        onSuccess={() => fetchData()}
+      />
+
+      {/* Smart Add Lead Modal */}
+      <SmartAddLeadModal
+        isOpen={smartAddModalOpen}
+        onClose={() => setSmartAddModalOpen(false)}
         onSuccess={() => fetchData()}
       />
     </div>

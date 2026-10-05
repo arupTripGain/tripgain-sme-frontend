@@ -8,6 +8,7 @@ import {
   ArrowLeft, Search, Filter, FileDown, MoreHorizontal, Building2, UploadCloud, UserPlus, Megaphone,
   Sparkles, CheckCircle2, AlertTriangle, RefreshCw, Eye, X, Clock, AlertCircle, ShieldCheck, ChevronDown, Check
 } from 'lucide-react';
+import SmartAddLeadModal from '@/components/SmartAddLeadModal';
 
 type PersonalizationFilterType = 'ALL' | 'GENERATED' | 'MISSING' | 'FAILED' | 'GENERATING';
 
@@ -31,6 +32,7 @@ export default function ListDashboardPage() {
   // Bulk Personalization state for this list
   const [bulkJob, setBulkJob] = useState<{ id: string; total: number; processed: number; successful: number; failed: number; status: string; progressPct: number } | null>(null);
   const [isStartingBulk, setIsStartingBulk] = useState(false);
+  const [smartAddModalOpen, setSmartAddModalOpen] = useState(false);
 
   const fetchListData = () => {
     apiFetch(`/api/lists/${id}`)
@@ -302,6 +304,13 @@ export default function ListDashboardPage() {
           </div>
           
           <div className="flex items-center gap-3">
+            <button 
+              type="button"
+              onClick={() => setSmartAddModalOpen(true)}
+              className="inline-flex items-center justify-center rounded-md text-sm font-semibold border border-orange-200 bg-orange-50/80 hover:bg-orange-100 text-[#F16F21] h-10 px-3.5 gap-2 shadow-xs transition-colors cursor-pointer"
+            >
+              <Sparkles className="h-4 w-4 text-[#F16F21]" /> Smart Add
+            </button>
             <button 
               onClick={() => router.push('/leads/import')}
               className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-border bg-card hover:bg-accent h-10 px-4 gap-2 shadow-sm text-secondary transition-colors"
@@ -996,6 +1005,13 @@ export default function ListDashboardPage() {
           </div>
         </div>
       )}
+      {/* Smart Add Lead Modal */}
+      <SmartAddLeadModal
+        isOpen={smartAddModalOpen}
+        onClose={() => setSmartAddModalOpen(false)}
+        defaultListId={id as string}
+        onSuccess={() => fetchListData()}
+      />
     </div>
   );
 }
