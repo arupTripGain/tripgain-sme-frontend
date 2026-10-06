@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { apiFetch } from '@/lib/api';
 import { 
   Sparkles, X, CheckCircle2, AlertTriangle, ArrowLeft, Plus, 
-  Building2, Mail, User, Globe, Briefcase, Check, Loader2
+  Building2, Mail, User, Globe, Briefcase, Check, Loader2, MapPin, Phone
 } from 'lucide-react';
 
 const LinkedInIcon = ({ className }: { className?: string }) => (
@@ -27,8 +27,10 @@ interface LeadFormState {
   lastName: string;
   fullName: string;
   email: string;
+  phone: string;
   jobTitle: string;
   companyName: string;
+  city: string;
   linkedinUrl: string;
   websiteUrl: string;
 }
@@ -36,8 +38,10 @@ interface LeadFormState {
 interface FieldStatusState {
   name: DetectionStatus;
   email: DetectionStatus;
+  phone: DetectionStatus;
   jobTitle: DetectionStatus;
   company: DetectionStatus;
+  city: DetectionStatus;
   linkedin: DetectionStatus;
   website: DetectionStatus;
 }
@@ -67,8 +71,10 @@ export default function SmartAddLeadModal({
     lastName: '',
     fullName: '',
     email: '',
+    phone: '',
     jobTitle: '',
     companyName: '',
+    city: '',
     linkedinUrl: '',
     websiteUrl: ''
   });
@@ -76,8 +82,10 @@ export default function SmartAddLeadModal({
   const [fieldStatus, setFieldStatus] = useState<FieldStatusState>({
     name: 'NOT_FOUND',
     email: 'NOT_FOUND',
+    phone: 'NOT_FOUND',
     jobTitle: 'NOT_FOUND',
     company: 'NOT_FOUND',
+    city: 'NOT_FOUND',
     linkedin: 'NOT_FOUND',
     website: 'NOT_FOUND'
   });
@@ -148,16 +156,20 @@ export default function SmartAddLeadModal({
       lastName: '',
       fullName: '',
       email: '',
+      phone: '',
       jobTitle: '',
       companyName: '',
+      city: '',
       linkedinUrl: '',
       websiteUrl: ''
     });
     setFieldStatus({
       name: 'NOT_FOUND',
       email: 'NOT_FOUND',
+      phone: 'NOT_FOUND',
       jobTitle: 'NOT_FOUND',
       company: 'NOT_FOUND',
+      city: 'NOT_FOUND',
       linkedin: 'NOT_FOUND',
       website: 'NOT_FOUND'
     });
@@ -210,8 +222,10 @@ export default function SmartAddLeadModal({
         lastName: p.lastName || '',
         fullName: p.fullName || `${p.firstName || ''} ${p.lastName || ''}`.trim(),
         email: p.email || '',
+        phone: p.phone || '',
         jobTitle: p.jobTitle || '',
         companyName: p.companyName || '',
+        city: p.city || '',
         linkedinUrl: p.linkedinUrl || '',
         websiteUrl: p.websiteUrl || ''
       });
@@ -247,8 +261,10 @@ export default function SmartAddLeadModal({
           lastName: leadForm.lastName.trim(),
           fullName: (leadForm.fullName.trim() || `${leadForm.firstName} ${leadForm.lastName}`).trim(),
           email: leadForm.email.trim() || null,
+          phone: leadForm.phone.trim() || null,
           jobTitle: leadForm.jobTitle.trim() || null,
           companyName: leadForm.companyName.trim() || null,
+          city: leadForm.city.trim() || null,
           linkedinUrl: leadForm.linkedinUrl.trim() || null,
           websiteUrl: leadForm.websiteUrl.trim() || null
         },
@@ -356,7 +372,7 @@ export default function SmartAddLeadModal({
                   <button
                     type="button"
                     onClick={() => {
-                      setRawText(`vikram@referrush.com\nVikram Pai\nFounder & CEO, ReferRush\nhttps://www.linkedin.com/in/vikram-a-pai/?isSelfProfile=false\nhttps://www.referrush.com/`);
+                      setRawText(`vikram@referrush.com\n+91 9876543210\nVikram Pai\nFounder & CEO, ReferRush\nKolkata\nhttps://www.linkedin.com/in/vikram-a-pai/?isSelfProfile=false\nhttps://www.referrush.com/`);
                     }}
                     className="text-xs text-[#F16F21] hover:underline font-medium"
                   >
@@ -367,7 +383,7 @@ export default function SmartAddLeadModal({
                   value={rawText}
                   onChange={(e) => setRawText(e.target.value)}
                   rows={8}
-                  placeholder={`email\nname\njob title / company\nLinkedIn URL\ncompany website\n\nExample:\nvikram@referrush.com\nVikram Pai\nFounder & CEO, ReferRush\nhttps://www.linkedin.com/in/vikram-a-pai/\nhttps://www.referrush.com/`}
+                  placeholder={`email\nphone number\nname\njob title / company\ncity\nLinkedIn URL\ncompany website\n\nExample:\nvikram@referrush.com\n+91 9876543210\nVikram Pai\nFounder & CEO, ReferRush\nKolkata\nhttps://www.linkedin.com/in/vikram-a-pai/\nhttps://www.referrush.com/`}
                   className="w-full p-3.5 text-sm font-mono border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F16F21]/20 focus:border-[#F16F21] outline-none transition-all placeholder:text-gray-400 bg-gray-50/50 focus:bg-white resize-y leading-relaxed"
                 />
               </div>
@@ -559,6 +575,23 @@ export default function SmartAddLeadModal({
                   )}
                 </div>
 
+                {/* Phone Number */}
+                <div className="col-span-1 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-gray-400" /> Phone Number
+                    </label>
+                    {renderBadge(fieldStatus.phone, leadForm.phone)}
+                  </div>
+                  <input
+                    type="tel"
+                    placeholder="+91 98765 43210"
+                    value={leadForm.phone}
+                    onChange={(e) => setLeadForm({ ...leadForm, phone: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md outline-none focus:ring-1 focus:ring-[#F16F21]"
+                  />
+                </div>
+
                 {/* Job Title */}
                 <div className="col-span-1 space-y-1.5">
                   <div className="flex items-center justify-between">
@@ -589,6 +622,23 @@ export default function SmartAddLeadModal({
                     placeholder="ReferRush"
                     value={leadForm.companyName}
                     onChange={(e) => setLeadForm({ ...leadForm, companyName: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md outline-none focus:ring-1 focus:ring-[#F16F21]"
+                  />
+                </div>
+
+                {/* City */}
+                <div className="col-span-1 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-gray-400" /> City
+                    </label>
+                    {renderBadge(fieldStatus.city, leadForm.city)}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Kolkata"
+                    value={leadForm.city}
+                    onChange={(e) => setLeadForm({ ...leadForm, city: e.target.value })}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md outline-none focus:ring-1 focus:ring-[#F16F21]"
                   />
                 </div>
