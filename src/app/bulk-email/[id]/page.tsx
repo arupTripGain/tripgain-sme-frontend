@@ -222,7 +222,7 @@ export default function BulkCampaignDetailPage() {
       case 'bounced':
         return <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200" title="Permanent failure - suppressed">Hard Bounced</span>;
       case 'replied':
-        return <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">Replied</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">Replied — sequence stopped</span>;
       case 'unsubscribed':
         return <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-50 text-orange-700 border border-orange-200">Unsubscribed</span>;
       case 'failed':

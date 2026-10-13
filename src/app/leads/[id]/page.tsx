@@ -579,9 +579,13 @@ export default function LeadProfilePage() {
                           <div>
                             <h3 className="font-medium text-secondary group-hover:text-primary transition-colors">{enrollment.campaign?.name || 'Unknown Campaign'}</h3>
                             <div className="flex items-center gap-3 mt-2">
-                              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded-full ring-1 ring-green-600/20 shadow-sm">
+                              <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full ring-1 shadow-sm ${
+                                enrollment.status === 'replied'
+                                  ? 'text-purple-700 bg-purple-50 ring-purple-600/20'
+                                  : 'text-green-700 bg-green-50 ring-green-600/20'
+                              }`}>
                                 <CheckCircle2 className="h-3 w-3" />
-                                {enrollment.status}
+                                {enrollment.status === 'replied' ? 'Replied — sequence stopped' : enrollment.status}
                               </span>
                               <span className="text-xs text-muted-foreground flex items-center gap-1 font-medium bg-muted px-2 py-0.5 rounded border border-border">
                                 Step {enrollment.currentStep || 1}

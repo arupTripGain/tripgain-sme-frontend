@@ -817,9 +817,9 @@ export default function CampaignDashboardPage() {
                                 ${['bounced', 'unsubscribed', 'failed'].includes(enroll.status) ? 'bg-red-100 text-red-700' : ''}
                                 ${enroll.status === 'paused' ? 'bg-yellow-100 text-yellow-700' : ''}
                               `}>
-                                {enroll.status}
+                                {enroll.status === 'replied' ? 'Replied — sequence stopped' : enroll.status}
                               </span>
-                              {enroll.stopReason && (
+                              {enroll.stopReason && enroll.status !== 'replied' && (
                                 <div className="text-xs text-red-500 font-medium mt-1 uppercase truncate max-w-[150px]">
                                   [{enroll.stopReason}]
                                 </div>
